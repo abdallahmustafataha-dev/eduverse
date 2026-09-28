@@ -1,0 +1,126 @@
+---
+import AuthLayout from '../../layouts/AuthLayout.astro';
+import { getDictionary } from '../../lib/copy';
+
+const copy = getDictionary('ar');
+const t = (key: string) => copy[key as keyof typeof copy];
+---
+
+<AuthLayout
+  locale="ar"
+  title={t('meta.verifyTitle')}
+  pathname="/ar/verify/"
+  eyebrow={t('auth.eyebrow')}
+  heading={t('auth.verify.title')}
+  sub={t('auth.verifyChecking')}
+>
+  <div class="message-region" data-auth-status aria-live="polite" aria-atomic="true"></div>
+
+  <p class="auth__links"><a class="link" href="/ar/login/">{t('auth.backLogin')}</a></p>
+
+  <div class="stack" data-resend hidden>
+    <p class="alert alert--info">{t('auth.checkInbox')}</p>
+    <div class="form-field">
+      <label for="verify-email">{t('auth.email')}</label>
+      <input
+        id="verify-email"
+        name="email"
+        type="email"
+        inputmode="email"
+        autocomplete="email"
+        dir="ltr"
+      />
+    </div>
+    <button type="button" class="btn btn--ghost btn--block" data-resend-btn>
+      {t('auth.resend')}
+    </button>
+  </div>
+
+  <script>
+    import type { SupabaseClient } from '@supabase/supabase-js';
+    import { supabase } from '../../lib/supabase';
+    import { startCooldown, localeFromDocument } from '../../lib/auth-ui';
+    import { getDictionary } from '../../lib/copy';
+    import { localePath, logDetail, setMessage } from '../../lib/site';
+
+    const locale = localeFromDocument();
+    const copy = getDictionary(locale);
+    const status = document.querySelector<HTMLElement>('[data-auth-status]');
+    const resendBox = document.querySelector<HTMLElement>('[data-resend]');
+    const resendBtn = document.querySelector<HTMLButtonElement>('[data-resend-btn]');
+    const emailField = document.querySelector<HTMLInputElement>('#verify-email');
+
+    function showResend(message: string) {
+      setMessage(status, message);
+      if (resendBox) resendBox.hidden = false;
+    }
+
+    function land() {
+      window.location.replace(localePath(locale, 'dashboard/'));
+    }
+
+    /* Supabase confirmation links arrive in more than one shape across client
+       versions, so all three are accepted before giving up (brief/02). */
+    async function confirm(client: SupabaseClient, params: URLSearchParams) {
+      const tokenHash = params.get('token_hash');
+      const token = params.get('token');
+      const code = params.get('code');
+
+      if (tokenHash) {
+        return client.auth.verifyOtp({ type: 'email', token_hash: tokenHash });
+      }
+      if (token) {
+        /* The legacy ?token= form still needs the address; the page asks for it
+           on the resend panel when the link arrives without one. */
+        const email = emailField?.value.trim() ?? '';
+        if (!email) {
+          showResend(copy['auth.emailRequired']);
+          return null;
+        }
+        return client.auth.verifyOtp({ type: 'email', email, token });
+      }
+      if (code) {
+        return client.auth.exchangeCodeForSession(code);
+      }
+      return null;
+    }
+
+    const params = new URLSearchParams(window.location.search);
+    const result = await confirm(supabase, params).catch((error) => {
+      logDetail('verify', error);
+      return { data: null, error: { message: 'verify failed' } } as never;
+    });
+
+    if (!result) {
+      showResend(copy['auth.verifyNoLink']);
+    } else if (result.error) {
+      logDetail('verify', result.error);
+      showResend(copy['auth.expired']);
+    } else if (result.data.session) {
+      setMessage(status, copy['auth.verifySuccess'], 'success');
+      window.setTimeout(land, 1200);
+    } else {
+      showResend(copy['auth.verifyNoLink']);
+    }
+
+    resendBtn?.addEventListener('click', async () => {
+      const email = emailField?.value.trim() ?? '';
+      if (!email) {
+        setMessage(status, copy['auth.emailRequired']);
+        return;
+      }
+      const { error } = await supabase.auth.resend({
+        type: 'signup',
+        email,
+        options: { emailRedirectTo: new URL(localePath(locale, 'verify/'), window.location.origin).href },
+      });
+      if (error) {
+        logDetail('verify-resend', error);
+        setMessage(status, copy['auth.generic']);
+        return;
+      }
+      setMessage(status, copy['auth.resendSent'], 'success');
+      startCooldown(resendBtn, 60);
+    });
+  </script>
+</AuthLayout>

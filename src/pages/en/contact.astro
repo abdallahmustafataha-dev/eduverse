@@ -1,0 +1,34 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import { getDictionary } from '../../lib/copy';
+
+const copy = getDictionary('en');
+const t = (key: string) => copy[key as keyof typeof copy];
+
+const EMAIL = 'abdallah.mustafa.taha@gmail.com';
+---
+
+<BaseLayout
+  locale="en"
+  title={t('meta.contactTitle')}
+  description={t('legal.contactLead')}
+  pathname="/en/contact/"
+>
+  <section class="section">
+    <div class="container">
+      <div class="section__head">
+        <p class="eyebrow">{t('nav.home')}</p>
+        <h1>{t('legal.contactTitle')}</h1>
+        <p class="section__lead">{t('legal.contactLead')}</p>
+      </div>
+
+      <div class="card empty-state">
+        <p class="empty-state__title">{t('legal.contactEmailLabel')}</p>
+        <p>
+          <a class="link" href={`mailto:${EMAIL}`}>{EMAIL}</a>
+        </p>
+        <p class="empty-state__note">{t('legal.contactResponse')}</p>
+      </div>
+    </div>
+  </section>
+</BaseLayout>

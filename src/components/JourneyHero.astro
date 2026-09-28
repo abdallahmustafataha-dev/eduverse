@@ -1,0 +1,297 @@
+---
+import { fmt, getDictionary, toArabicDigits, type Locale } from '../lib/copy';
+import { gradeName, type Grade } from '../lib/data';
+import { localePath } from '../lib/site';
+
+interface Props {
+  locale: Locale;
+  grades: Grade[];
+  gradeCount: number;
+  subjectCount: number;
+}
+
+const { locale, grades, gradeCount, subjectCount } = Astro.props;
+const copy = getDictionary(locale);
+const t = (key: string) => copy[key as keyof typeof copy];
+const rtl = locale === 'ar';
+const total = grades.length;
+
+/* --- Road geometry ------------------------------------------------------
+   The road and the 12 stations are generated from the SAME curve function, so
+   every node sits exactly on the drawn line. A dense Catmull-Rom sample keeps
+   the error under a pixel.
+
+   RTL: rather than flipping the SVG with a transform (which would mirror the
+   text), the x mapping itself is reversed, so the road genuinely starts on the
+   right and every label stays readable. */
+function catmullRom(points: { x: number; y: number }[]): string {
+  if (points.length < 2) return '';
+  const n = (v: number) => v.toFixed(2);
+  let d = `M ${n(points[0].x)} ${n(points[0].y)}`;
+  for (let i = 0; i < points.length - 1; i++) {
+    const p0 = points[i - 1] ?? points[i];
+    const p1 = points[i];
+    const p2 = points[i + 1];
+    const p3 = points[i + 2] ?? p2;
+    d +=
+      ` C ${n(p1.x + (p2.x - p0.x) / 6)} ${n(p1.y + (p2.y - p0.y) / 6)}` +
+      ` ${n(p2.x - (p3.x - p1.x) / 6)} ${n(p2.y - (p3.y - p1.y) / 6)}` +
+      ` ${n(p2.x)} ${n(p2.y)}`;
+  }
+  return d;
+}
+
+const SAMPLES = 132;
+
+// Horizontal: a winding S across 1240x300. The envelope flattens both ends so
+// the road leaves and arrives level, like a real road.
+const H = { w: 1240, h: 300, x0: 62, x1: 1178, cy: 152, amp: 64 };
+function hPoint(t: number) {
+  const rawX = H.x0 + (H.x1 - H.x0) * t;
+  const envelope = Math.sin(Math.PI * t);
+  const wave = Math.sin(3 * Math.PI * t) * envelope;
+  return { x: rtl ? H.x1 - (rawX - H.x0) : rawX, y: H.cy - H.amp * wave };
+}
+
+// Vertical (phones): the same 12 stations flowing down the page.
+const V = { w: 240, h: 1420, y0: 70, y1: 1350, cx: 120, amp: 30 };
+function vPoint(t: number) {
+  const rawX = V.cx - V.amp * Math.sin(2 * Math.PI * t);
+  return { x: rawX, y: V.y0 + (V.y1 - V.y0) * t };
+}
+
+const hPath = catmullRom(Array.from({ length: SAMPLES + 1 }, (_, i) => hPoint(i / SAMPLES)));
+const vPath = catmullRom(Array.from({ length: SAMPLES + 1 }, (_, i) => vPoint(i / SAMPLES)));
+
+const hStations = grades.map((grade, i) => ({ grade, p: hPoint(i / Math.max(1, total - 1)) }));
+const vStations = grades.map((grade, i) => ({ grade, p: vPoint(i / Math.max(1, total - 1)) }));
+
+/* Short station captions so 12 labels stay legible across the width.
+   The full official name lives in the screen-reader list, the tooltip, and the
+   grade chips below. */
+function levelOf(slug: string): string {
+  if (slug.includes('secondary')) return t('catalog.level.secondary');
+  if (slug.includes('prep')) return t('catalog.level.prep');
+  return t('catalog.level.primary');
+}
+function numberOf(slug: string): string {
+  const match = slug.match(/(\d+)/);
+  const n = match ? match[1] : '';
+  return rtl ? toArabicDigits(n) : `Grade ${n}`;
+}
+
+const stats = [
+  fmt(t('journey.grades'), { n: rtl ? toArabicDigits(gradeCount) : gradeCount }),
+  fmt(t('journey.subjects'), { n: rtl ? toArabicDigits(subjectCount) : subjectCount }),
+  t('journey.curricula'),
+];
+---
+
+<section class="hero" id="journey" data-journey-root>
+  <img
+    class="hero__watermark"
+    data-logo
+    data-light="/eduverse-logos/eduverse-light.svg"
+    data-dark="/eduverse-logos/eduverse-dark.svg"
+    src="/eduverse-logos/eduverse-light.svg"
+    alt=""
+    aria-hidden="true"
+  />
+
+  <div class="container">
+    <!-- The headline sits ABOVE the start of the road (brief/01 §1) -->
+    <p class="hero__eyebrow">{t('hero.eyebrow')}</p>
+    <h1 class="hero__title">{t('hero.title')}</h1>
+    <p class="hero__sub">{t('hero.sub')}</p>
+
+    <!-- RULE #1: the logo floats on its own paper card above the start -->
+    <p class="hero__logo">
+      <a class="logo-card" href={localePath(locale)} aria-label={copy['brand.home']}>
+        <img
+          data-logo
+          data-light="/eduverse-logos/eduverse-light.svg"
+          data-dark="/eduverse-logos/eduverse-dark.svg"
+          src="/eduverse-logos/eduverse-light.svg"
+          width="260"
+          alt={t('hero.logoAlt')}
+        />
+      </a>
+    </p>
+
+    <div class="journey" data-journey>
+      <h2 class="sr-only">{t('journey.heading')}</h2>
+      <p class="section__lead">{t('journey.sub')}</p>
+
+      <!-- The road is decorative: the real list of 12 grades follows for AT. -->
+      <figure class="journey__figure" aria-hidden="true">
+        <!-- Desktop: horizontal winding road -->
+        <svg
+          class="journey__svg journey__svg--wide"
+          viewBox={`0 0 ${H.w} ${H.h}`}
+          focusable="false"
+          preserveAspectRatio="xMidYMid meet"
+          data-journey-svg
+        >
+          <path class="road-base" d={hPath} />
+          <path class="road-draw" d={hPath} pathLength="1" data-road-draw />
+          {
+            hStations.map(({ grade, p }, i) => (
+              <a
+                class="station station__link"
+                data-station
+                data-index={i}
+                href={localePath(locale, `grades/${grade.slug}/`)}
+                tabindex="-1"
+              >
+                <circle class="station__ring" cx={p.x} cy={p.y} r="13" />
+                <circle class="station__core" cx={p.x} cy={p.y} r="4" />
+                <text class="station__label" x={p.x} y={p.y + 34}>
+                  {numberOf(grade.slug)}
+                </text>
+                <text class="station__level" x={p.x} y={p.y + 50}>
+                  {levelOf(grade.slug)}
+                </text>
+              </a>
+            ))
+          }
+        </svg>
+
+        <!-- Phones: the same 12 stations flowing down the page -->
+        <svg
+          class="journey__svg journey__svg--tall"
+          viewBox={`0 0 ${V.w} ${V.h}`}
+          focusable="false"
+          preserveAspectRatio="xMidYMin meet"
+          data-journey-svg
+        >
+          <path class="road-base" d={vPath} />
+          <path class="road-draw" d={vPath} pathLength="1" data-road-draw />
+          {
+            vStations.map(({ grade, p }, i) => (
+              <a
+                class="station station__link"
+                data-station
+                data-index={i}
+                href={localePath(locale, `grades/${grade.slug}/`)}
+                tabindex="-1"
+              >
+                <circle class="station__ring" cx={p.x} cy={p.y} r="13" />
+                <circle class="station__core" cx={p.x} cy={p.y} r="4" />
+                <text class="station__label" x={p.x} y={p.y + 36}>
+                  {numberOf(grade.slug)}
+                </text>
+                <text class="station__level" x={p.x} y={p.y + 52}>
+                  {levelOf(grade.slug)}
+                </text>
+              </a>
+            ))
+          }
+        </svg>
+      </figure>
+
+      <!-- Scroll HUD: counter + progress -->
+      <div class="journey__hud">
+        <span class="journey__counter" data-journey-counter>
+          {fmt(t('journey.station'), { n: rtl ? toArabicDigits(1) : 1, total: rtl ? toArabicDigits(total) : total })}
+        </span>
+        <span class="journey__track">
+          <span class="journey__bar" data-journey-bar style="width:8.33%"></span>
+        </span>
+        <span class="badge">{t('journey.start')}</span>
+      </div>
+
+      <!-- Screen-reader equivalent of the drawn road (brief/01 §1 a11y) -->
+      <div class="sr-only">
+        <h3>{t('journey.stationListLabel')}</h3>
+        <ol>
+          {
+            grades.map((grade) => (
+              <li>
+                {gradeName(grade, locale)} — {levelOf(grade.slug)}
+              </li>
+            ))
+          }
+        </ol>
+      </div>
+    </div>
+
+    <!-- Stats card near the end, then the CTA AT the end of the road -->
+    <div class="journey__end">
+      <p class="journey__stats">
+        {stats.map((item, i) => (
+          <>
+            {i > 0 && <span aria-hidden="true"> • </span>}
+            <b>{item}</b>
+          </>
+        ))}
+      </p>
+      <a class="btn btn--primary btn--lg" href={localePath(locale, 'login/')} data-journey-cta>
+        {t('journey.finishCta')}
+      </a>
+    </div>
+  </div>
+</section>
+
+<script>
+  /* Progressive scroll draw: stroke-dashoffset drives the maroon line, stations
+     light as they are reached, and the counter keeps pace.
+     With prefers-reduced-motion the road is simply complete from the start.
+     With JS disabled the base track plus all 12 labels still render, so the
+     journey reads perfectly well. */
+  import { fmt, getDictionary, toArabicDigits } from '../lib/copy';
+  import { localeFromDocument } from '../lib/auth-ui';
+
+    const root = document.querySelector<HTMLElement>('[data-journey]');
+    if (root) {
+      const locale = localeFromDocument();
+      const copy = getDictionary(locale);
+      /* Both orientations ship in the DOM and CSS paints one of them, so the
+         stations are counted per SVG — never 12 + 12. */
+      const svgs = Array.from(root.querySelectorAll<SVGElement>('[data-journey-svg]'));
+      const total = svgs[0]?.querySelectorAll('[data-station]').length || 12;
+      const counter = root.querySelector<HTMLElement>('[data-journey-counter]');
+      const bar = root.querySelector<HTMLElement>('[data-journey-bar]');
+      const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+      const setProgress = (p: number) => {
+        const clamped = Math.min(1, Math.max(0, p));
+        const reached = Math.max(1, Math.round(clamped * total));
+        for (const svg of svgs) {
+          const path = svg.querySelector<SVGPathElement>('[data-road-draw]');
+          if (path) path.style.strokeDashoffset = String(1 - clamped);
+          svg.querySelectorAll<SVGElement>('[data-station]').forEach((station) => {
+            const index = Number(station.dataset.index ?? '0');
+            station.classList.toggle('is-reached', index < reached);
+          });
+        }
+        if (bar) bar.style.width = `${(reached / total) * 100}%`;
+        if (counter) {
+          const n = locale === 'ar' ? toArabicDigits(reached) : String(reached);
+          const t = locale === 'ar' ? toArabicDigits(total) : String(total);
+          counter.textContent = fmt(copy['journey.station'], { n, total: t });
+        }
+      };
+
+    if (reduce) {
+      setProgress(1);
+    } else {
+      let ticking = false;
+      const onScroll = () => {
+        if (ticking) return;
+        ticking = true;
+        window.requestAnimationFrame(() => {
+          ticking = false;
+          const rect = root.getBoundingClientRect();
+          const vh = window.innerHeight || document.documentElement.clientHeight;
+          const enter = vh * 0.9;
+          const span = rect.height + vh * 0.35;
+          setProgress((enter - rect.top) / span);
+        });
+      };
+      setProgress(0);
+      window.addEventListener('scroll', onScroll, { passive: true });
+      window.addEventListener('resize', onScroll, { passive: true });
+      onScroll();
+    }
+  }
+</script>

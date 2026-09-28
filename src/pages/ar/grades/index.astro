@@ -1,0 +1,61 @@
+---
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+import { getGradesWithSubjectCounts, gradeName, type GradeLevel } from '../../../lib/data';
+import { getDictionary, fmt, toArabicDigits } from '../../../lib/copy';
+import { localePath } from '../../../lib/site';
+
+const locale = 'ar';
+const copy = getDictionary(locale);
+const t = (key: string) => copy[key as keyof typeof copy];
+
+const rows = await getGradesWithSubjectCounts();
+const count = (v: number) => fmt(copy['grades.subjectCount'], { n: toArabicDigits(v) });
+
+const LEVEL: Record<GradeLevel, string> = {
+  primary: copy['level.primary'],
+  prep: copy['level.prep'],
+  secondary: copy['level.secondary'],
+};
+---
+
+<BaseLayout
+  locale="ar"
+  title={t('meta.gradesTitle')}
+  description={t('grades.sub')}
+  pathname="/ar/grades/"
+>
+  <section class="section">
+    <div class="container">
+      <div class="section__head">
+        <p class="eyebrow">{t('nav.grades')}</p>
+        <h1>{t('grades.title')}</h1>
+        <p class="section__lead">{t('grades.sub')}</p>
+      </div>
+
+      {
+        rows.length === 0 ? (
+          <p class="empty">
+            <span>{t('grades.empty')}</span>
+          </p>
+        ) : (
+          <div class="grade-grid">
+            {rows.map(({ grade, subjects }) => (
+              <article class="card grade-card">
+                <p class="grade-card__level">{LEVEL[grade.level]}</p>
+                <h2 class="grade-card__name">{gradeName(grade, locale)}</h2>
+                <p class="grade-card__count">{count(subjects.length)}</p>
+                <a class="btn btn--primary" href={localePath(locale, `grades/${grade.slug}/`)}>
+                  {t('grades.open')}
+                </a>
+              </article>
+            ))}
+          </div>
+        )
+      }
+
+      <p class="catalog__back">
+        <a class="link-quiet" href={localePath(locale, '')}>{t('grades.backJourney')}</a>
+      </p>
+    </div>
+  </section>
+</BaseLayout>

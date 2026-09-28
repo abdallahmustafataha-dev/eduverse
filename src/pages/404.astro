@@ -1,4 +1,59 @@
 ---
 import '../styles/tokens.css';
+import { getDictionary } from '../lib/copy';
+import { absoluteUrl } from '../lib/site';
+
+const copy = getDictionary('en');
+const t = (key: string) => copy[key as keyof typeof copy];
+const ogImage = absoluteUrl('/og-image.png');
 ---
-<html lang="en"><head><meta charset="utf-8" /><title>404 — EduVerse</title></head><body><main class="wrap"><h1>404</h1><p><a href="/en/">EN</a> | <a href="/ar/">عربي</a></p></main></body></html>
+
+<!doctype html>
+<html lang="en" dir="ltr" data-theme="light">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>404 — {copy['brand.name']}</title>
+    <meta name="description" content={copy['notFound.sub']} />
+    <meta name="robots" content="noindex" />
+    <link rel="icon" type="image/svg+xml" href="/eduverse-logos/eduverse-light.svg" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="EduVerse" />
+    <meta property="og:title" content={`404 — ${copy['brand.name']}`} />
+    <meta property="og:description" content={copy['notFound.sub']} />
+    <meta property="og:image" content={ogImage} />
+    <meta property="og:locale" content="en_US" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <script is:inline>
+      try {
+        const saved = localStorage.getItem('theme');
+        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        document.documentElement.dataset.theme = saved || (prefersDark ? 'dark' : 'light');
+      } catch {}
+    </script>
+  </head>
+  <body>
+    <a class="skip-link" href="#main-content">{copy['nav.skipContent']}</a>
+    <main id="main-content" class="section">
+      <div class="container">
+        <div class="notfound">
+          <p class="notfound__code">404</p>
+          <h1 class="notfound__title">{t('notFound.title')}</h1>
+          <p class="section__lead">{t('notFound.sub')}</p>
+          <div class="final-cta__actions">
+            <a class="btn btn--primary" href="/en/">{t('notFound.home')}</a>
+            <a class="btn btn--ghost" href="/en/grades/">{t('notFound.grades')}</a>
+            <a class="btn btn--ghost" href="https://educhat.pages.dev" target="_blank" rel="noopener">
+              {t('notFound.help')}
+            </a>
+          </div>
+          <p class="row notfound__lang">
+            <a class="link-quiet" href="/ar/" hreflang="ar" lang="ar">العربية</a>
+          </p>
+        </div>
+      </div>
+    </main>
+  </body>
+</html>

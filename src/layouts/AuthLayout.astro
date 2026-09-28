@@ -1,0 +1,66 @@
+---
+import BaseLayout from './BaseLayout.astro';
+import { getDictionary, type Locale } from '../lib/copy';
+import { localePath } from '../lib/site';
+
+interface Props {
+  locale: Locale;
+  title: string;
+  description?: string;
+  pathname?: string;
+  eyebrow: string;
+  heading: string;
+  sub?: string;
+}
+
+const { locale, title, description, pathname, eyebrow, heading, sub } = Astro.props;
+const copy = getDictionary(locale);
+const t = (key: string) => copy[key as keyof typeof copy];
+---
+
+<BaseLayout
+  locale={locale}
+  title={title}
+  description={description}
+  pathname={pathname}
+  compactHeader
+  showFooter={false}
+>
+  <div class="auth">
+    <!--
+      Logo panel. It is the FIRST grid child, so in LTR it lands on the left and
+      in RTL (dir="rtl" on <html>) the grid's inline direction flips and it
+      lands on the right. One layout, mirrored — no duplicate markup.
+      On phones (<760px) the grid collapses and this stacks above the form.
+    -->
+    <aside class="auth__panel">
+      <span class="logo-card">
+        <img
+          data-logo
+          data-light="/eduverse-logos/eduverse-light.svg"
+          data-dark="/eduverse-logos/eduverse-dark.svg"
+          src="/eduverse-logos/eduverse-light.svg"
+          width="260"
+          alt={copy['hero.logoAlt']}
+        />
+      </span>
+      <p class="auth__promise">{t('auth.promise')}</p>
+      <p>
+        <a class="link-quiet" href={localePath(locale)}>
+          ← {t('nav.home')}
+        </a>
+      </p>
+    </aside>
+
+    <div class="auth__form-side">
+      <div class="auth__inner">
+        <div class="auth__heading">
+          <span class="eyebrow">{eyebrow}</span>
+          <h1>{heading}</h1>
+          {sub && <p>{sub}</p>}
+        </div>
+        <slot />
+      </div>
+    </div>
+  </div>
+</BaseLayout>

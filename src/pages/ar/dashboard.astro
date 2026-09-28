@@ -1,0 +1,155 @@
+---
+import AppLayout from '../../layouts/AppLayout.astro';
+import Skeleton from '../../components/Skeleton.astro';
+import { getDictionary } from '../../lib/copy';
+
+const copy = getDictionary('ar');
+const t = (key: string) => copy[key as keyof typeof copy];
+---
+
+<AppLayout
+  locale="ar"
+  title={t('meta.dashboardTitle')}
+  pathname="/ar/dashboard/"
+  active="side.dashboard"
+>
+  <div>
+    <header class="app__head">
+      <h1 data-greeting>{t('dash.greeting')}</h1>
+      <p class="app__lead">{t('dash.lead')}</p>
+    </header>
+
+    <section class="widget" aria-labelledby="dash-search-title">
+      <h2 class="widget__title" id="dash-search-title">{t('dash.searchTitle')}</h2>
+      <form class="widget__form" role="search" data-dash-search action="/ar/search/" method="get">
+        <label class="sr-only" for="dash-search">{t('dash.searchLabel')}</label>
+        <input
+          id="dash-search"
+          name="q"
+          type="search"
+          placeholder={t('dash.searchLabel')}
+          autocomplete="off"
+        />
+        <button type="submit" class="btn btn--primary">{t('dash.searchBtn')}</button>
+      </form>
+    </section>
+
+    <section class="widget" aria-labelledby="dash-continue-title">
+      <h2 class="widget__title" id="dash-continue-title">{t('dash.continueTitle')}</h2>
+      <p class="offline-note" data-offline hidden>{t('dash.offline')}</p>
+      <div class="resume" data-continue>
+        <div data-continue-loading>
+          <Skeleton variant="text" lines={2} />
+        </div>
+        <div class="resume__body" data-continue-body hidden></div>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    import { supabase } from '../../lib/supabase';
+    import { getContinueTarget, type ResumeTarget } from '../../lib/personal';
+    import { getDictionary, toArabicDigits } from '../../lib/copy';
+    import { localeFromDocument } from '../../lib/auth-ui';
+    import { localePath, logDetail } from '../../lib/site';
+
+    const locale = localeFromDocument();
+    const copy = getDictionary(locale);
+    const host = document.querySelector<HTMLElement>('[data-continue]');
+    const loading = document.querySelector<HTMLElement>('[data-continue-loading]');
+    const body = document.querySelector<HTMLElement>('[data-continue-body]');
+    const offline = document.querySelector<HTMLElement>('[data-offline]');
+    const greeting = document.querySelector<HTMLElement>('[data-greeting]');
+
+    function n(value: number): string {
+      return locale === 'ar' ? toArabicDigits(value) : String(value);
+    }
+
+    function fill(key: string, value: number): string {
+      return copy[key as keyof typeof copy].replace('{n}', n(value));
+    }
+
+    function makeLink(href: string, label: string): HTMLAnchorElement {
+      const a = document.createElement('a');
+      a.className = 'btn btn--primary';
+      a.href = href;
+      a.textContent = label;
+      return a;
+    }
+
+    function renderEmpty() {
+      if (!body || !host) return;
+      body.replaceChildren();
+      host.replaceChildren(body);
+      const p = document.createElement('p');
+      p.textContent = copy['dash.continueEmpty'];
+      const wrap = document.createElement('div');
+      wrap.className = 'empty';
+      wrap.append(p, makeLink(localePath(locale, 'grades/grade-1-primary/'), copy['dash.continueEmptyCta']));
+      body.append(wrap);
+      body.hidden = false;
+    }
+
+    function renderTarget(target: ResumeTarget) {
+      if (!body || !host) return;
+      body.replaceChildren();
+      host.replaceChildren(body);
+      body.hidden = false;
+
+      const label = document.createElement('p');
+      label.className = 'resume__title';
+      label.textContent = `${copy['dash.continuePrefix']} ${target.title}`;
+      body.append(label);
+
+      if (target.percent !== null && target.percent > 0) {
+        const row = document.createElement('div');
+        row.className = 'progress';
+        const bar = document.createElement('span');
+        bar.className = 'progress__bar';
+        bar.style.inlineSize = `${Math.min(100, Math.round(target.percent))}%`;
+        const text = document.createElement('span');
+        text.className = 'progress__text';
+        text.textContent = fill('dash.progressLabel', target.percent);
+        row.append(bar, text);
+        body.append(row);
+      } else if (target.focusMinutes > 0) {
+        const meta = document.createElement('p');
+        meta.className = 'resume__meta';
+        meta.textContent = fill('dash.focusMinutes', target.focusMinutes);
+        body.append(meta);
+      } else {
+        const meta = document.createElement('p');
+        meta.className = 'resume__meta';
+        meta.textContent = copy['dash.progressLabel'].replace('{n}', '0');
+        body.append(meta);
+      }
+
+      host.append(makeLink(target.href, copy['dash.resumeCta']));
+    }
+
+    async function load() {
+      try {
+        const { data, error } = await supabase.auth.getUser();
+        if (error || !data.user) return;
+
+        if (greeting) {
+          const meta = data.user.user_metadata as Record<string, string> | undefined;
+          const name = meta?.full_name || meta?.name || (data.user.email ?? '').split('@')[0];
+          if (name) greeting.textContent = copy['dash.greetingNamed'].replace('{name}', name);
+        }
+
+        const target = await getContinueTarget(data.user.id, locale);
+        if (loading) loading.hidden = true;
+        if (target) renderTarget(target);
+        else renderEmpty();
+      } catch (error) {
+        logDetail('continue', error);
+        if (loading) loading.hidden = true;
+        renderEmpty();
+        if (offline) offline.hidden = false;
+      }
+    }
+
+    void load();
+  </script>
+</AppLayout>

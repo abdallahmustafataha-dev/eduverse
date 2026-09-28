@@ -1,0 +1,19 @@
+---
+import AuthLayout from '../../layouts/AuthLayout.astro';
+import AuthPanel from '../../components/AuthPanel.astro';
+import { getDictionary } from '../../lib/copy';
+
+const copy = getDictionary('ar');
+const t = (key: string) => copy[key as keyof typeof copy];
+---
+
+<AuthLayout
+  locale="ar"
+  title={t('meta.loginTitle')}
+  pathname="/ar/login/"
+  eyebrow={t('auth.eyebrow')}
+  heading={t('auth.login.title')}
+  sub={t('auth.login.sub')}
+>
+  <AuthPanel locale="ar" mode="login" />
+</AuthLayout>

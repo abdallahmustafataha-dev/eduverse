@@ -1,0 +1,61 @@
+---
+import BaseLayout from '../../../../layouts/BaseLayout.astro';
+import { getGradeBySlug, getGrades, getSubjects, gradeName, subjectName } from '../../../../lib/data';
+import { getDictionary, fmt } from '../../../../lib/copy';
+import { localePath } from '../../../../lib/site';
+
+export async function getStaticPaths() {
+  const grades = await getGrades();
+  return grades.map((grade) => ({ params: { grade: grade.slug } }));
+}
+
+const locale = 'en';
+const copy = getDictionary(locale);
+const t = (key: string) => copy[key as keyof typeof copy];
+
+const slug = Astro.params.grade ?? '';
+const grade = await getGradeBySlug(slug);
+const subjects = grade ? await getSubjects(grade.id) : [];
+const name = grade ? gradeName(grade, locale) : '';
+---
+
+<BaseLayout
+  locale="en"
+  title={fmt(copy['meta.gradeTitle'], { grade: name })}
+  description={fmt(copy['subjectsOf'], { grade: name })}
+  pathname={`/en/grades/${slug}/`}
+>
+  <section class="section">
+    <div class="container">
+      <div class="section__head">
+        <p class="eyebrow">{t('nav.grades')}</p>
+        <h1>{name}</h1>
+        <p class="section__lead">{t('subject.title')}</p>
+      </div>
+
+      {
+        subjects.length === 0 ? (
+          <p class="empty">
+            <span>{t('subject.empty')}</span>
+          </p>
+        ) : (
+          <div class="subject-grid">
+            {subjects.map((subject) => (
+              <a
+                class="card subject-card"
+                href={localePath(locale, `grades/${slug}/subjects/${subject.slug}/`)}
+              >
+                <h2 class="subject-card__name">{subjectName(subject, locale)}</h2>
+                <span class="subject-card__go" aria-hidden="true">→</span>
+              </a>
+            ))}
+          </div>
+        )
+      }
+
+      <p class="catalog__back">
+        <a class="link-quiet" href={localePath(locale, 'grades/')}>{t('subject.backToGrades')}</a>
+      </p>
+    </div>
+  </section>
+</BaseLayout>

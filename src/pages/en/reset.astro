@@ -1,0 +1,78 @@
+---
+import AuthLayout from '../../layouts/AuthLayout.astro';
+import { getDictionary } from '../../lib/copy';
+
+const copy = getDictionary('en');
+const t = (key: string) => copy[key as keyof typeof copy];
+---
+
+<AuthLayout
+  locale="en"
+  title={t('meta.resetTitle')}
+  pathname="/en/reset/"
+  eyebrow={t('auth.eyebrow')}
+  heading={t('auth.reset.title')}
+  sub={t('auth.reset.sub')}
+>
+  <div class="message-region" data-auth-status aria-live="polite" aria-atomic="true"></div>
+
+  <form class="stack" data-reset-form novalidate>
+    <div class="form-field">
+      <label for="reset-password">{t('auth.newPassword')}</label>
+      <input
+        id="reset-password"
+        name="password"
+        type="password"
+        autocomplete="new-password"
+        minlength="8"
+        required
+        dir="ltr"
+      />
+      <small class="form-hint">{t('auth.passwordHint')}</small>
+    </div>
+    <button type="submit" class="btn btn--primary btn--lg btn--block" data-reset-submit>
+      {t('auth.updatePassword')}
+    </button>
+  </form>
+
+  <script>
+    import { supabase } from '../../lib/supabase';
+    import { localeFromDocument } from '../../lib/auth-ui';
+    import { getDictionary } from '../../lib/copy';
+    import { localePath, logDetail, setButtonBusy, setMessage } from '../../lib/site';
+
+    const locale = localeFromDocument();
+    const copy = getDictionary(locale);
+    const form = document.querySelector<HTMLFormElement>('[data-reset-form]');
+    const status = document.querySelector<HTMLElement>('[data-auth-status]');
+    const submit = document.querySelector<HTMLButtonElement>('[data-reset-submit]');
+
+    /* The reset link establishes a recovery session before this form works. */
+    supabase.auth.getSession().then(({ data }) => {
+      if (!data.session) {
+        form?.setAttribute('hidden', '');
+        submit?.setAttribute('disabled', '');
+        setMessage(status, copy['auth.resetNoSession']);
+      }
+    });
+
+    form?.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const password = String(new FormData(form).get('password') ?? '');
+      if (password.length < 8) {
+        setMessage(status, copy['auth.passwordRequired']);
+        return;
+      }
+      setButtonBusy(submit, true, copy['auth.working']);
+      const { error } = await supabase.auth.updateUser({ password });
+      setButtonBusy(submit, false);
+      if (error) {
+        logDetail('reset', error);
+        setMessage(status, copy['auth.expired']);
+        return;
+      }
+      setMessage(status, copy['auth.resetDone'], 'success');
+      window.setTimeout(() => window.location.replace(localePath(locale, 'dashboard/')), 1200);
+    });
+  </script>
+</AuthLayout>

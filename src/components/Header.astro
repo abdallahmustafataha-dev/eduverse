@@ -1,0 +1,103 @@
+---
+import { getDictionary, type Locale } from '../lib/copy';
+import { localePath, swapLocalePathname } from '../lib/site';
+
+interface Props {
+  locale: Locale;
+  compact?: boolean;
+  /** Hide the marketing links on app/auth screens. */
+  minimal?: boolean;
+}
+
+const { locale, compact = false, minimal = false } = Astro.props;
+const copy = getDictionary(locale);
+const other = locale === 'ar' ? 'en' : 'ar';
+const current = Astro.url.pathname;
+const localeHref = swapLocalePathname(current, locale, other);
+const t = (key: string) => copy[key as keyof typeof copy];
+---
+
+<header class="site-header">
+  <div class="wrap site-header__inner">
+    <a class="brand" href={localePath(locale)} aria-label={copy['brand.home']}>
+      <span class="brand__mark">
+        <img
+          data-logo
+          data-light="/eduverse-logos/eduverse-light.svg"
+          data-dark="/eduverse-logos/eduverse-dark.svg"
+          src="/eduverse-logos/eduverse-light.svg"
+          width="28"
+          height="28"
+          alt=""
+        />
+      </span>
+      <span class="brand__word">EduVerse</span>
+    </a>
+
+    <nav class="site-header__nav" aria-label={copy['nav.menu']}>
+      <div class="site-header__links" id="site-nav-menu" data-nav-menu>
+        {
+          !minimal && (
+            <>
+              <a class="nav-link" href={localePath(locale, 'grades/grade-1-primary/')}>
+                {t('nav.grades')}
+              </a>
+              <a class="nav-link" href={localePath(locale, 'search/')}>{t('nav.search')}</a>
+            </>
+          )
+        }
+        <a class="nav-link" data-auth-dash hidden href={localePath(locale, 'dashboard/')}>
+          {t('nav.dashboard')}
+        </a>
+        <a class="nav-link" data-auth-login href={localePath(locale, 'login/')}>
+          {t('nav.login')}
+        </a>
+        <a class="nav-link" data-auth-logout hidden href={localePath(locale, 'dashboard/')}>
+          {t('nav.logout')}
+        </a>
+      </div>
+
+      <a
+        class="icon-btn"
+        data-locale-link
+        href={localeHref}
+        lang={other}
+        hreflang={other}
+        aria-label={`${copy['nav.language']} — ${other === 'ar' ? copy['nav.toArabic'] : copy['nav.toEnglish']}`}
+      >
+        {other === 'ar' ? 'ع' : 'EN'}
+      </a>
+
+      <button
+        type="button"
+        class="icon-btn"
+        data-theme-toggle
+        aria-pressed="false"
+        aria-label={copy['nav.themeToDark']}
+        data-label-dark={copy['nav.themeToDark']}
+        data-label-light={copy['nav.themeToLight']}
+      >
+        <span aria-hidden="true">◐</span>
+      </button>
+
+      {
+        compact ? (
+          <a class="btn btn--primary btn--sm" href={localePath(locale, 'signup/')}>
+            {t('nav.signup')}
+          </a>
+        ) : null
+      }
+
+      <button
+        type="button"
+        class="icon-btn nav-toggle"
+        data-nav-toggle
+        aria-expanded="false"
+        aria-controls="site-nav-menu"
+        aria-label={copy['nav.openMenu']}
+      >
+        <span aria-hidden="true">☰</span>
+      </button>
+    </nav>
+  </div>
+</header>

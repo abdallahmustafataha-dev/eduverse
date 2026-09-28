@@ -18,7 +18,9 @@ human. Amounts: XP correct +10, lesson done +50, pomodoro +20, referral +100.
 - Likes: `lesson_likes` same pattern (toggle)
 - Study plans: `study_plans` full CRUD own rows (`items` jsonb array)
 - Pomodoro: on finish → insert `focus_sessions {user_id, duration_min, subject_id?}` + bump XP (below)
-- Continue learning: latest `focus_sessions` (or latest bookmark) → lesson slug
+- Continue learning: latest `focus_sessions` → `lesson_id` (uuid, nullable, FK lessons)
+  if set → lesson slug; else `subject_id` → subject page; else latest bookmark;
+  else empty state. (Column added 2026-09-27; RLS unchanged, row-level.)
 - Quiz XP / progress: no table — XP goes to `user_stats`, progress derived
 - Polls: vote → insert `poll_votes {poll_id, user_id, option_index}` (ONE vote:
   no update policy by design); results → `select * from rpc('poll_results', {poll_id})`

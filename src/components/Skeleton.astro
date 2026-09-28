@@ -1,0 +1,19 @@
+---
+/** Neutral loading placeholders. aria-hidden, because the surrounding live
+ *  region already announces the state to screen readers. */
+interface Props {
+  variant?: 'card' | 'text' | 'row';
+  lines?: number;
+  class?: string;
+}
+
+const { variant = 'card', lines = 1, class: className = '' } = Astro.props;
+---
+
+{
+  variant === 'text' ? (
+    Array.from({ length: lines }).map(() => <span class:list={['skeleton', 'skeleton--line', className]} />)
+  ) : (
+    <div class:list={['skeleton', variant === 'row' && 'skeleton--row', className]} aria-hidden="true" />
+  )
+}

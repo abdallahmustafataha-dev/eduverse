@@ -1,0 +1,117 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import JourneyHero from './JourneyHero.astro';
+import { getDictionary, toArabicDigits, type Locale } from '../lib/copy';
+import { getCatalogCounts, getGrades } from '../lib/data';
+import { FOUNDER_PORTRAIT, localePath } from '../lib/site';
+
+interface Props {
+  locale: Locale;
+}
+
+const { locale } = Astro.props;
+const copy = getDictionary(locale);
+const t = (key: string) => copy[key as keyof typeof copy];
+const rtl = locale === 'ar';
+
+const [grades, counts] = await Promise.all([getGrades(), getCatalogCounts()]);
+const n = (value: number) => (rtl ? toArabicDigits(value) : String(value));
+
+const goals = [
+  { title: t('vision.goal1'), body: t('vision.goal1Body') },
+  { title: t('vision.goal2'), body: t('vision.goal2Body') },
+  { title: t('vision.goal3'), body: t('vision.goal3Body') },
+];
+---
+
+<BaseLayout
+  locale={locale}
+  title={t('meta.title')}
+  description={t('meta.description')}
+  pathname={locale === 'ar' ? '/ar/' : '/en/'}
+  compactHeader
+  stickyCtaHref={localePath(locale, 'login/')}
+  stickyCtaLabel={t('journey.finishCta')}
+>
+  {/* ---- Section 1: The Student Journey ---- */}
+  <JourneyHero
+    locale={locale}
+    grades={grades}
+    gradeCount={counts.grades}
+    subjectCount={counts.subjects}
+  />
+
+  {/* ---- Section 2: Vision & Goals ---- */}
+  <section class="section" id="vision">
+    <div class="container">
+      <div class="section__head">
+        <p class="eyebrow">{t('vision.kicker')}</p>
+        <h2>{t('vision.title')}</h2>
+        <p class="section__lead">{t('vision.lead')}</p>
+      </div>
+      <ul class="goal-grid">
+        {
+          goals.map((goal, i) => (
+            <li class="goal">
+              <span class="goal__num" aria-hidden="true">
+                {n(i + 1)}
+              </span>
+              <h3>{goal.title}</h3>
+              <p>{goal.body}</p>
+            </li>
+          ))
+        }
+      </ul>
+    </div>
+  </section>
+
+  {/* ---- Section 3: Founder ---- */}
+  <section class="section section--tint" id="founder">
+    <div class="container founder">
+      {/* Portrait slot: designed now, and switches to the real photo as soon as
+          FOUNDER_PORTRAIT in lib/site.ts points at a file. */}
+      <div class="founder__portrait">
+        {
+          FOUNDER_PORTRAIT ? (
+            <img
+              src={FOUNDER_PORTRAIT}
+              alt={t('founder.portraitAlt')}
+              width="320"
+              height="320"
+              loading="lazy"
+              decoding="async"
+            />
+          ) : (
+            <span class="founder__slot">
+              <span class="founder__monogram" aria-hidden="true">AT</span>
+              <span class="founder__pending">{t('founder.portraitPending')}</span>
+            </span>
+          )
+        }
+      </div>
+      <div class="founder__body">
+        <p class="eyebrow">{t('founder.kicker')}</p>
+        <h2>{t('founder.title')}</h2>
+        <p>{t('founder.body')}</p>
+      </div>
+    </div>
+  </section>
+
+  {/* ---- Section 4: Final CTA ---- */}
+  <section class="section final-cta" id="start">
+    <div class="container">
+      <div class="final-cta__inner">
+        <h2>{t('finalCta.title')}</h2>
+        <p>{t('finalCta.sub')}</p>
+        <div class="final-cta__actions">
+          <a class="btn btn--primary btn--lg" href={localePath(locale, 'login/')}>
+            {t('journey.finishCta')}
+          </a>
+          <a class="btn btn--ghost btn--lg" href={localePath(locale, 'grades/grade-1-primary/')}>
+            {t('hero.cta2')}
+          </a>
+        </div>
+      </div>
+    </div>
+  </section>
+</BaseLayout>

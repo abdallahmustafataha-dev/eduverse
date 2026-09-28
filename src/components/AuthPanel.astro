@@ -1,0 +1,215 @@
+---
+import GoogleButton from './GoogleButton.astro';
+import { getDictionary, type Locale } from '../lib/copy';
+import { localePath } from '../lib/site';
+
+interface Props {
+  locale: Locale;
+  mode: 'login' | 'signup';
+}
+
+const { locale, mode } = Astro.props;
+const copy = getDictionary(locale);
+const t = (key: string) => copy[key as keyof typeof copy];
+const isSignup = mode === 'signup';
+---
+
+{/* Every error is rendered as text in this live region, never silently. */}
+<div class="message-region" data-auth-status aria-live="polite" aria-atomic="true"></div>
+
+<form class="stack" data-auth-form data-mode={mode} novalidate>
+  <div class="form-field">
+    <label for="auth-email">{t('auth.email')}</label>
+    <input
+      id="auth-email"
+      name="email"
+      type="email"
+      inputmode="email"
+      autocomplete="email"
+      required
+      dir="ltr"
+    />
+  </div>
+
+  <div class="form-field">
+    <label for="auth-password">{t('auth.password')}</label>
+    <input
+      id="auth-password"
+      name="password"
+      type="password"
+      autocomplete={isSignup ? 'new-password' : 'current-password'}
+      minlength="8"
+      required
+      dir="ltr"
+    />
+    <small class="form-hint">{t('auth.passwordHint')}</small>
+  </div>
+
+  <button type="submit" class="btn btn--primary btn--lg btn--block" data-auth-submit>
+    {isSignup ? t('auth.signupBtn') : t('auth.loginBtn')}
+  </button>
+</form>
+
+{/* Hidden until an unconfirmed address actually needs a resend. */}
+<div class="resend-row" data-resend hidden>
+  <span data-resend-text />
+  <button type="button" class="btn btn--ghost" data-resend-btn>
+    {t('auth.resend')}
+  </button>
+</div>
+
+<div class="divider" role="separator">
+  <span>{t('auth.or')}</span>
+</div>
+
+<GoogleButton label={t('auth.google')} />
+
+<p class="auth__links">
+  {
+    isSignup ? (
+      <a class="link" href={localePath(locale, 'login/')}>
+        {t('auth.hasAccount')}
+      </a>
+    ) : (
+      <a class="link" href={localePath(locale, 'forgot/')}>
+        {t('auth.forgot')}
+      </a>
+    )
+  }
+</p>
+
+<script>
+  /* One panel serves /login and /signup, so both paths are always one click
+     away and the Google button is available on each (brief/02). */
+  import { supabase } from '../lib/supabase';
+  import {
+    authErrorMessage,
+    beginGoogleAuth,
+    hasSeenWelcome,
+    localeFromDocument,
+    resendSignup,
+    startCooldown,
+  } from '../lib/auth-ui';
+  import { getDictionary } from '../lib/copy';
+  import { localePath, logDetail, setButtonBusy, setMessage } from '../lib/site';
+
+  const locale = localeFromDocument();
+  const copy = getDictionary(locale);
+
+  const form = document.querySelector<HTMLFormElement>('[data-auth-form]');
+  const status = document.querySelector<HTMLElement>('[data-auth-status]');
+  const submit = document.querySelector<HTMLButtonElement>('[data-auth-submit]');
+  const resendBox = document.querySelector<HTMLElement>('[data-resend]');
+  const resendBtn = document.querySelector<HTMLButtonElement>('[data-resend-btn]');
+  const resendText = document.querySelector<HTMLElement>('[data-resend-text]');
+  const google = document.querySelector<HTMLButtonElement>('[data-google]');
+
+  const isSignup = form?.dataset.mode === 'signup';
+  const params = new URLSearchParams(window.location.search);
+  const next = params.get('next') || localePath(locale, 'dashboard/');
+  const safeNext = next.startsWith('/') && !next.startsWith('//') ? next : localePath(locale, 'dashboard/');
+
+  /** Signed in: send them on, showing /welcome exactly once. */
+  function land(): void {
+    if (hasSeenWelcome()) {
+      window.location.replace(safeNext);
+    } else {
+      window.location.replace(localePath(locale, 'welcome/'));
+    }
+  }
+
+  function showResend(): void {
+    if (!resendBox || !resendText) return;
+    resendBox.hidden = false;
+    resendText.textContent = `${copy['auth.unverified']} ${copy['auth.checkInbox']}`;
+    if (resendBtn) {
+      resendBtn.dataset.defaultLabel = copy['auth.resend'];
+      startCooldown(resendBtn, 60);
+    }
+  }
+
+  form?.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const data = new FormData(form);
+    const email = String(data.get('email') ?? '').trim();
+    const password = String(data.get('password') ?? '');
+
+    if (!email) {
+      setMessage(status, copy['auth.emailRequired']);
+      return;
+    }
+    if (password.length < 8) {
+      setMessage(status, copy['auth.passwordRequired']);
+      return;
+    }
+
+    setButtonBusy(submit, true, copy['auth.working']);
+
+    if (isSignup) {
+      /* Duplicate-email pre-check via the email_exists RPC (brief/02). */
+      const { data: exists, error: rpcError } = await supabase.rpc('email_exists', {
+        check_email: email,
+      });
+      if (rpcError) logDetail('email_exists', rpcError);
+      if (exists === true) {
+        setButtonBusy(submit, false);
+        setMessage(status, copy['auth.emailExists']);
+        return;
+      }
+
+      const { data: result, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: { emailRedirectTo: new URL(localePath(locale, 'verify/'), window.location.origin).href },
+      });
+      setButtonBusy(submit, false);
+      if (error) {
+        setMessage(status, authErrorMessage(error, locale));
+        return;
+      }
+      if (result.session) {
+        land();
+        return;
+      }
+      setMessage(status, copy['auth.checkInbox'], 'success');
+      showResend();
+      return;
+    }
+
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    setButtonBusy(submit, false);
+    if (error) {
+      /* One unified message for a wrong email and/or a wrong password. The
+         only exception is an unconfirmed address, which gets the resend flow. */
+      if (authErrorMessage(error, locale) === copy['auth.emailNotConfirmed']) {
+        setMessage(status, '');
+        showResend();
+        return;
+      }
+      setMessage(status, authErrorMessage(error, locale));
+      return;
+    }
+    land();
+  });
+
+  resendBtn?.addEventListener('click', async () => {
+    const email = String(new FormData(form as HTMLFormElement).get('email') ?? '').trim();
+    await resendSignup(locale, email, resendBtn, status);
+    startCooldown(resendBtn, 60);
+  });
+
+  google?.addEventListener('click', () => {
+    void beginGoogleAuth(locale, google, status);
+  });
+
+  /* Already signed in? Skip the form entirely (brief/02: verify with
+     getUser(), never a local store). */
+  supabase.auth
+    .getUser()
+    .then(({ data }) => {
+      if (data.user) window.location.replace(safeNext);
+    })
+    .catch(() => {
+      /* Unsigned: the form is already usable. */
+    });
+</script>

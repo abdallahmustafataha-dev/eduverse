@@ -1,0 +1,35 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import { getDictionary } from '../../lib/copy';
+
+const copy = getDictionary('ar');
+const t = (key: string) => copy[key as keyof typeof copy];
+---
+
+<BaseLayout locale="ar" title={t('meta.welcomeTitle')} pathname="/ar/welcome/" compactHeader>
+  <section class="section welcome">
+    <div class="container welcome__inner">
+      <span class="logo-card">
+        <img
+          data-logo
+          data-light="/eduverse-logos/eduverse-light.svg"
+          data-dark="/eduverse-logos/eduverse-dark.svg"
+          src="/eduverse-logos/eduverse-light.svg"
+          width="260"
+          alt={t('hero.logoAlt')}
+        />
+      </span>
+      <h1>{t('meta.welcomeTitle')}</h1>
+      <p>{t('auth.promise')}</p>
+      <a class="btn btn--primary btn--lg" href="/ar/dashboard/">{t('side.dashboard')}</a>
+    </div>
+  </section>
+
+  <script>
+    import { markWelcomeSeen } from '../../lib/auth-ui';
+    import { initSite } from '../../lib/site';
+
+    initSite();
+    markWelcomeSeen();
+  </script>
+</BaseLayout>

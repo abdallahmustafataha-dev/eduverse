@@ -1,0 +1,226 @@
+---
+import Icon from './Icon.astro';
+import type { IconName } from '../lib/icons';
+import { getDictionary, type Locale } from '../lib/copy';
+import { localePath } from '../lib/site';
+
+interface Props {
+  locale: Locale;
+  active?: string;
+}
+
+const { locale, active = 'side.dashboard' } = Astro.props;
+const copy = getDictionary(locale);
+const t = (key: string) => copy[key as keyof typeof copy];
+
+/* Order is fixed by brief/03-dashboard. Badge counts are allowed ONLY on
+   Bookmarks and Planner. "Ask EduChat" is an external sibling app. */
+const items: {
+  key: string;
+  icon: IconName;
+  href: string;
+  badge?: 'bookmark' | 'plan';
+  external?: boolean;
+}[] = [
+  { key: 'side.dashboard', icon: 'home', href: localePath(locale, 'dashboard/') },
+  { key: 'side.myGrades', icon: 'grade', href: localePath(locale, 'grades/grade-1-primary/') },
+  { key: 'side.search', icon: 'search', href: localePath(locale, 'search/') },
+  { key: 'side.bookmarks', icon: 'flashcards', href: localePath(locale, 'bookmarks/'), badge: 'bookmark' },
+  { key: 'side.planner', icon: 'clock', href: localePath(locale, 'planner/'), badge: 'plan' },
+  { key: 'side.quiz', icon: 'quiz', href: localePath(locale, 'quiz/') },
+  { key: 'side.flashcards', icon: 'flashcards', href: localePath(locale, 'flashcards/') },
+  { key: 'side.glossary', icon: 'book', href: localePath(locale, 'glossary/') },
+  { key: 'side.exams', icon: 'subjects', href: localePath(locale, 'exams/') },
+  { key: 'side.calculator', icon: 'spark', href: localePath(locale, 'calculator/') },
+  { key: 'side.polls', icon: 'leaderboard', href: localePath(locale, 'polls/') },
+  { key: 'side.leaderboard', icon: 'badge', href: localePath(locale, 'leaderboard/') },
+  { key: 'side.referrals', icon: 'parent', href: localePath(locale, 'referrals/') },
+  {
+    key: 'side.educhat',
+    icon: 'spark',
+    href: 'https://educhat.pages.dev',
+    external: true,
+  },
+  { key: 'side.account', icon: 'settings', href: localePath(locale, 'profile/') },
+];
+---
+
+{/* The drawer overlay is part of the shell so it can sit above the page. */}
+<button type="button" class="sidebar__overlay" data-sidebar-close hidden></button>
+
+<aside class="sidebar" data-sidebar id="app-sidebar">
+  <nav class="sidebar__nav" aria-label={t('side.title')}>
+    {
+      items.map((item) => (
+        <a
+          class="side-link"
+          aria-current={active === item.key ? 'page' : undefined}
+          href={item.href}
+          {...item.external ? { target: '_blank', rel: 'noopener' } : {}}
+        >
+          <Icon name={item.icon} size={20} />
+          <span class="side-link__text">{t(item.key)}</span>
+          {item.badge && (
+            <span class="badge badge--count side-link__count" data-count={item.badge} hidden />
+          )}
+          {item.external && <Icon name="chevron" size={16} flip class="side-link__out" />}
+        </a>
+      ))
+    }
+    <a
+      class="side-link side-link--quiet"
+      data-auth-logout
+      hidden
+      href={localePath(locale, 'dashboard/')}
+    >
+      <Icon name="logout" size={20} flip />
+      <span class="side-link__text">{t('side.logout')}</span>
+    </a>
+  </nav>
+</aside>
+
+<script>
+  /* Desktop: collapse to an icon rail. Mobile: a real drawer with an overlay,
+     Esc to close, and the focus held inside while open (brief/03). */
+  import { supabase } from '../lib/supabase';
+  import { getBadgeCounts } from '../lib/personal';
+  import { localeFromDocument } from '../lib/auth-ui';
+  import { getDictionary, toArabicDigits } from '../lib/copy';
+
+  const locale = localeFromDocument();
+  const copy = getDictionary(locale);
+  const t = (key: string) => copy[key as keyof typeof copy];
+  const app = document.querySelector<HTMLElement>('[data-app]');
+  const sidebar = document.querySelector<HTMLElement>('[data-sidebar]');
+  const overlay = document.querySelector<HTMLButtonElement>('[data-sidebar-close]');
+  const toggle = document.querySelector<HTMLButtonElement>('[data-sidebar-toggle]');
+  const mobile = window.matchMedia('(max-width: 760px)');
+
+  const FOCUSABLE = 'a[href], button:not([disabled]), input, [tabindex]:not([tabindex="-1"])';
+
+  function isDrawer(): boolean {
+    return mobile.matches;
+  }
+
+  function labelToggle(collapsed: boolean) {
+    if (toggle) toggle.setAttribute('aria-label', t(collapsed ? 'nav.expandSidebar' : 'nav.collapseSidebar'));
+  }
+
+  function setCollapsed(collapsed: boolean) {
+    app?.classList.toggle('app--collapsed', collapsed);
+    if (toggle && !isDrawer()) {
+      toggle.setAttribute('aria-expanded', String(!collapsed));
+      labelToggle(collapsed);
+    }
+    try {
+      window.localStorage.setItem('eduverse.sidebar', collapsed ? 'collapsed' : 'open');
+    } catch {
+      /* private mode: the rail simply does not persist */
+    }
+  }
+
+  function setDrawer(open: boolean, moveFocus = true) {
+    if (!sidebar) return;
+    if (open) {
+      sidebar.setAttribute('data-open', '');
+    } else {
+      sidebar.removeAttribute('data-open');
+    }
+    if (overlay) overlay.hidden = !open;
+    toggle?.setAttribute('aria-expanded', String(open));
+    if (toggle) {
+      toggle.setAttribute(
+        'aria-label',
+        open ? t('nav.closeMenu') : t('nav.openMenu'),
+      );
+    }
+    if (!moveFocus) return;
+    if (open) {
+      sidebar.querySelector<HTMLElement>(FOCUSABLE)?.focus();
+    } else {
+      toggle?.focus();
+    }
+  }
+
+  try {
+    if (window.localStorage.getItem('eduverse.sidebar') === 'collapsed') setCollapsed(true);
+  } catch {
+    /* ignore */
+  }
+
+  /* Init must follow the current mode: on desktop the rail is open (expanded),
+     on mobile the drawer starts shut. Never yank focus on first paint. */
+  if (isDrawer()) {
+    setDrawer(false, false);
+  } else {
+    toggle?.setAttribute('aria-expanded', 'true');
+    labelToggle(app?.classList.contains('app--collapsed') ?? false);
+  }
+
+  toggle?.addEventListener('click', () => {
+    if (isDrawer()) {
+      setDrawer(!sidebar?.hasAttribute('data-open'));
+    } else {
+      setCollapsed(!app?.classList.contains('app--collapsed'));
+    }
+  });
+
+  overlay?.addEventListener('click', () => setDrawer(false));
+
+  document.addEventListener('keydown', (event) => {
+    if (!isDrawer() || !sidebar?.hasAttribute('data-open')) return;
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      setDrawer(false);
+      return;
+    }
+    /* Focus trap while the drawer owns the screen. */
+    if (event.key !== 'Tab') return;
+    const nodes = Array.from(sidebar.querySelectorAll<HTMLElement>(FOCUSABLE)).filter(
+      (node) => node.offsetParent !== null,
+    );
+    if (!nodes.length) return;
+    const first = nodes[0];
+    const last = nodes[nodes.length - 1];
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  });
+
+  mobile.addEventListener('change', () => {
+    if (isDrawer()) {
+      setDrawer(false);
+    } else {
+      sidebar?.removeAttribute('data-open');
+      if (overlay) overlay.hidden = true;
+      toggle?.setAttribute('aria-expanded', 'true');
+      labelToggle(app?.classList.contains('app--collapsed') ?? false);
+    }
+  });
+
+  function showCount(kind: 'bookmark' | 'plan', value: number) {
+    if (value <= 0) return;
+    document.querySelectorAll<HTMLElement>(`[data-count="${kind}"]`).forEach((el) => {
+      el.textContent = locale === 'ar' ? toArabicDigits(value) : String(value);
+      el.hidden = false;
+    });
+  }
+
+  supabase.auth
+    .getUser()
+    .then(async ({ data }) => {
+      if (!data.user) return;
+      const counts = await getBadgeCounts(data.user.id).catch(() => null);
+      if (counts) {
+        showCount('bookmark', counts.bookmarks);
+        showCount('plan', counts.plans);
+      }
+    })
+    .catch(() => {
+      /* Badges are decoration: never break the shell. */
+    });
+</script>

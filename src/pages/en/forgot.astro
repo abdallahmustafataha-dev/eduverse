@@ -1,0 +1,65 @@
+---
+import AuthLayout from '../../layouts/AuthLayout.astro';
+import { getDictionary } from '../../lib/copy';
+
+const copy = getDictionary('en');
+const t = (key: string) => copy[key as keyof typeof copy];
+---
+
+<AuthLayout
+  locale="en"
+  title={t('meta.forgotTitle')}
+  pathname="/en/forgot/"
+  eyebrow={t('auth.eyebrow')}
+  heading={t('auth.forgot.title')}
+  sub={t('auth.forgot.sub')}
+>
+  <div class="message-region" data-auth-status aria-live="polite" aria-atomic="true"></div>
+
+  <form class="stack" data-forgot-form novalidate>
+    <div class="form-field">
+      <label for="forgot-email">{t('auth.email')}</label>
+      <input id="forgot-email" name="email" type="email" inputmode="email" autocomplete="email" required dir="ltr" />
+    </div>
+    <button type="submit" class="btn btn--primary btn--lg btn--block" data-forgot-submit>
+      {t('auth.sendLink')}
+    </button>
+  </form>
+
+  <p class="auth__links">
+    <a class="link" href="/en/login/">{t('auth.backLogin')}</a>
+  </p>
+
+  <script>
+    import { supabase } from '../../lib/supabase';
+    import { authErrorMessage, localeFromDocument } from '../../lib/auth-ui';
+    import { getDictionary } from '../../lib/copy';
+    import { localePath, logDetail, setButtonBusy, setMessage } from '../../lib/site';
+
+    const locale = localeFromDocument();
+    const copy = getDictionary(locale);
+    const form = document.querySelector<HTMLFormElement>('[data-forgot-form]');
+    const status = document.querySelector<HTMLElement>('[data-auth-status]');
+    const submit = document.querySelector<HTMLButtonElement>('[data-forgot-submit]');
+
+    form?.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const email = String(new FormData(form).get('email') ?? '').trim();
+      if (!email) {
+        setMessage(status, copy['auth.emailRequired']);
+        return;
+      }
+      setButtonBusy(submit, true, copy['auth.sending']);
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: new URL(localePath(locale, 'reset/'), window.location.origin).href,
+      });
+      setButtonBusy(submit, false);
+      if (error) {
+        logDetail('forgot', error);
+        setMessage(status, authErrorMessage(error, locale));
+        return;
+      }
+      setMessage(status, copy['auth.forgotSent'], 'success');
+    });
+  </script>
+</AuthLayout>

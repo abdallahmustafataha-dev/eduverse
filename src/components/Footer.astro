@@ -1,0 +1,89 @@
+---
+import { getDictionary, type Locale } from '../lib/copy';
+import { familyApps, localePath } from '../lib/site';
+
+interface Props {
+  locale: Locale;
+}
+
+const { locale } = Astro.props;
+const copy = getDictionary(locale);
+const t = (key: string) => copy[key as keyof typeof copy];
+const year = new Date().getFullYear();
+---
+
+<footer class="site-footer">
+  <div class="wrap">
+    <div class="site-footer__grid">
+      <div>
+        <span class="logo-card" style="background:#FFFBF5">
+          <img
+            data-logo
+            data-light="/eduverse-logos/eduverse-light.svg"
+            data-dark="/eduverse-logos/eduverse-dark.svg"
+            src="/eduverse-logos/eduverse-light.svg"
+            width="200"
+            alt={copy['hero.logoAlt']}
+          />
+        </span>
+        <p style="margin-top:var(--space-md);color:var(--muted);max-width:34ch">
+          {t('footer.appsBlurb')}
+        </p>
+      </div>
+
+      <div>
+        <p class="footer-title">{t('footer.apps')}</p>
+        <nav class="site-footer__links" aria-label={t('footer.apps')}>
+          {
+            familyApps.map((app) => (
+              <a class="app-link" href={app.url} rel="noopener" target="_blank">
+                <img
+                  data-logo
+                  data-light={app.light}
+                  data-dark={app.dark}
+                  src={app.light}
+                  width="26"
+                  height="26"
+                  alt=""
+                />
+                <span>{app.name}</span>
+              </a>
+            ))
+          }
+        </nav>
+      </div>
+
+      <div>
+        <p class="footer-title">{t('footer.explore')}</p>
+        <nav class="site-footer__links" aria-label={t('footer.explore')}>
+          <a href={localePath(locale, 'grades/grade-1-primary/')}>{t('nav.grades')}</a>
+          <a href={localePath(locale, 'search/')}>{t('nav.search')}</a>
+          <a href={localePath(locale, 'quiz/')}>{t('side.quiz')}</a>
+          <a href={localePath(locale, 'flashcards/')}>{t('side.flashcards')}</a>
+        </nav>
+      </div>
+
+      <div>
+        <p class="footer-title">{t('footer.account')}</p>
+        <nav class="site-footer__links" aria-label={t('footer.account')}>
+          <a data-auth-login href={localePath(locale, 'login/')}>{t('nav.login')}</a>
+          <a data-auth-login href={localePath(locale, 'signup/')}>{t('nav.signup')}</a>
+          <a data-auth-dash hidden href={localePath(locale, 'dashboard/')}>{t('nav.dashboard')}</a>
+        </nav>
+        <p class="footer-title" style="margin-top:var(--space-lg)">{t('footer.legal')}</p>
+        <nav class="site-footer__links" aria-label={t('footer.legal')}>
+          <a href={localePath(locale, 'privacy/')}>{t('footer.privacy')}</a>
+          <a href={localePath(locale, 'terms/')}>{t('footer.terms')}</a>
+          <a href={localePath(locale, 'contact/')}>{t('footer.contact')}</a>
+        </nav>
+      </div>
+    </div>
+
+    <div class="site-footer__bottom">
+      <p>© {year} {t('footer.copyright')} {t('footer.rights')}</p>
+      <p>
+        <a class="link-quiet" href={localePath(locale, 'contact/')}>{t('contact.email')}</a>
+      </p>
+    </div>
+  </div>
+</footer>

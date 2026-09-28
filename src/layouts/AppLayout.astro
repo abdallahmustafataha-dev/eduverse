@@ -1,0 +1,102 @@
+---
+import BaseLayout from './BaseLayout.astro';
+import Sidebar from '../components/Sidebar.astro';
+import Icon from '../components/Icon.astro';
+import { getDictionary, type Locale } from '../lib/copy';
+import { localePath } from '../lib/site';
+
+interface Props {
+  locale: Locale;
+  title: string;
+  description?: string;
+  pathname?: string;
+  active?: string;
+  showCookieBanner?: boolean;
+}
+
+const {
+  locale,
+  title,
+  description,
+  pathname = typeof Astro.url !== 'undefined' ? Astro.url.pathname : '/',
+  active = 'home',
+  showCookieBanner = false,
+} = Astro.props;
+const copy = getDictionary(locale);
+const t = (key: string) => copy[key as keyof typeof copy];
+---
+
+<BaseLayout
+  locale={locale}
+  title={title}
+  description={description}
+  pathname={pathname}
+  showCookieBanner={showCookieBanner}
+  bodyClass="app-body"
+>
+  {/* Starts locked: identity is checked before the private shell is revealed, so
+      a signed-out visitor never sees it flash before being gated. */}
+  <div class="app is-locked" data-app>
+    <Sidebar locale={locale} active={active} />
+    <div class="app__main">
+      <div class="app__bar">
+        <button
+          type="button"
+          class="app__bar-toggle"
+          data-sidebar-toggle
+          aria-expanded="true"
+          aria-controls="app-sidebar"
+          aria-label={t('nav.collapseSidebar')}
+        >
+          <Icon name="menu" size={20} />
+        </button>
+      </div>
+      <slot />
+    </div>
+  </div>
+
+  {/* Signed-out visitors are shown the auth gate instead of private widgets, and
+      are returned to exactly where they were headed. */}
+  <div class="auth-gate" data-auth-gate hidden>
+    <div class="auth-gate__card">
+      <h2>{t('dash.signInTitle')}</h2>
+      <p>{t('dash.signInSub')}</p>
+      <div class="auth-gate__actions">
+        <a
+          class="btn btn--primary"
+          data-gate-login
+          href={`${localePath(locale, 'login/')}?next=${encodeURIComponent(pathname)}`}
+        >
+          {t('nav.login')}
+        </a>
+        <a
+          class="btn btn--ghost"
+          data-gate-signup
+          href={`${localePath(locale, 'signup/')}?next=${encodeURIComponent(pathname)}`}
+        >
+          {t('nav.signup')}
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    /* BaseLayout already ran initSite(); this only gates the private shell. */
+    import { supabase } from '../lib/supabase';
+
+    const gate = document.querySelector<HTMLElement>('[data-auth-gate]');
+    const app = document.querySelector<HTMLElement>('[data-app]');
+    supabase.auth
+      .getUser()
+      .then(({ data }) => {
+        const signedIn = Boolean(data.user);
+        if (gate) gate.hidden = signedIn;
+        if (app) app.classList.toggle('is-locked', !signedIn);
+      })
+      .catch(() => {
+        /* If identity cannot be established, fail closed to the gate. */
+        if (gate) gate.hidden = false;
+        app?.classList.add('is-locked');
+      });
+  </script>
+</BaseLayout>

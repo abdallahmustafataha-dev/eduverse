@@ -1,0 +1,113 @@
+---
+import BaseLayout from '../../../../../layouts/BaseLayout.astro';
+import {
+  getGradeBySlug,
+  getGrades,
+  getSubjectBySlug,
+  getSubjects,
+  gradeName,
+  lessonName,
+  subjectName,
+  getLessons,
+} from '../../../../../lib/data';
+import { getDictionary, fmt } from '../../../../../lib/copy';
+import { localePath } from '../../../../../lib/site';
+
+export async function getStaticPaths() {
+  const grades = await getGrades();
+  const pairs = await Promise.all(
+    grades.map(async (grade) => {
+      const subjects = await getSubjects(grade.id);
+      return subjects.map((subject) => ({ grade: grade.slug, subject: subject.slug }));
+    }),
+  );
+  return pairs.flat().map((params) => ({ params }));
+}
+
+const locale = 'en';
+const copy = getDictionary(locale);
+const t = (key: string) => copy[key as keyof typeof copy];
+
+const gradeSlug = Astro.params.grade ?? '';
+const subjectSlug = Astro.params.subject ?? '';
+
+const grade = await getGradeBySlug(gradeSlug);
+const subject = grade ? await getSubjectBySlug(grade.id, subjectSlug) : null;
+const lessons = subject ? await getLessons(subject.id) : [];
+
+const gradeLabel = grade ? gradeName(grade, locale) : '';
+const subjectLabel = subject ? subjectName(subject, locale) : '';
+
+/* brief/04: the empty state is the current reality, so it must still be a
+   useful page — never blank, always with a way forward. */
+const chatHref = subject
+  ? `https://educhat.pages.dev?lesson=${encodeURIComponent(subject.slug)}`
+  : 'https://educhat.pages.dev';
+const chatLabel = fmt(copy['subject.askChat'], { subject: subjectLabel });
+---
+
+<BaseLayout
+  locale="en"
+  title={fmt(copy['meta.gradeSubjectTitle'], { grade: gradeLabel, subject: subjectLabel })}
+  description={fmt(copy['subjectsOf'], { grade: gradeLabel })}
+  pathname={`/en/grades/${gradeSlug}/subjects/${subjectSlug}/`}
+>
+  <section class="section">
+    <div class="container">
+      <nav class="crumbs" aria-label={copy['nav.grades']}>
+        <a class="link-quiet" href={localePath(locale, '')}>{t('grades.backJourney')}</a>
+        <span aria-hidden="true">/</span>
+        <a class="link-quiet" href={localePath(locale, 'grades/')}>{t('subject.backToGrades')}</a>
+        <span aria-hidden="true">/</span>
+        <a class="link-quiet" href={localePath(locale, `grades/${gradeSlug}/`)}>{gradeLabel}</a>
+      </nav>
+
+      <div class="section__head">
+        <h1>{subjectLabel}</h1>
+        <p class="section__lead">{t('subject.lessons')}</p>
+      </div>
+
+      {
+        lessons.length === 0 ? (
+          <div class="card empty-state">
+            <p class="empty-state__title">{t('subject.comingSoon')}</p>
+            <p class="empty-state__note">{t('subject.noLessons')}</p>
+            <a class="btn btn--primary" href={chatHref} target="_blank" rel="noopener">
+              {chatLabel}
+            </a>
+          </div>
+        ) : (
+          <ul class="subject-grid">
+            {lessons.map((lesson) => (
+              <li class="card subject-card">
+                <h2 class="subject-card__name">{lessonName(lesson, locale)}</h2>
+                <a
+                  class="link-quiet"
+                  href={localePath(locale, `lessons/${lesson.slug}/`)}
+                >
+                  {t('subject.lessons')}
+                </a>
+              </li>
+            ))}
+          </ul>
+        )
+      }
+
+      {
+        lessons.length > 0 && (
+          <p class="catalog__back">
+            <a class="btn btn--ghost" href={chatHref} target="_blank" rel="noopener">
+              {chatLabel}
+            </a>
+          </p>
+        )
+      }
+
+      <p class="catalog__back">
+        <a class="link-quiet" href={localePath(locale, `grades/${gradeSlug}/`)}>
+          {t('subject.backToGrade')}
+        </a>
+      </p>
+    </div>
+  </section>
+</BaseLayout>

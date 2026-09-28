@@ -1,0 +1,22 @@
+---
+import { getDictionary, type Locale } from '../lib/copy';
+import { localePath } from '../lib/site';
+
+interface Props {
+  locale: Locale;
+}
+
+const { locale } = Astro.props;
+const copy = getDictionary(locale);
+const t = (key: string) => copy[key as keyof typeof copy];
+---
+
+<div class="cookie-banner" data-cookie-banner hidden role="region" aria-label={t('cookie.text')}>
+  <p>
+    {t('cookie.text')}{' '}
+    <a class="link" href={localePath(locale, 'privacy/')}>{t('cookie.more')}</a>
+  </p>
+  <button type="button" class="btn btn--primary btn--sm" data-cookie-accept>
+    {t('cookie.accept')}
+  </button>
+</div>
