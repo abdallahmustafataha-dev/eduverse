@@ -30,7 +30,11 @@ function seoFiles() {
         /** @type {string[]} */
         const locs = [];
         /** Pages that must never be advertised. */
-        const skip = new Set(['404.html']);
+        const privateRoutes = ['login', 'signup', 'forgot', 'reset', 'verify', 'welcome', 'dashboard'];
+        const skip = new Set([
+          '404.html',
+          ...privateRoutes.flatMap((route) => ['en', 'ar'].map((l) => `${l}/${route}/index.html`)),
+        ]);
 
         /** @param {string} dirAbs */
         const walk = (dirAbs) => {
