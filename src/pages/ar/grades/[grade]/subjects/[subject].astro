@@ -49,7 +49,7 @@ const chatLabel = fmt(copy['subject.askChat'], { subject: subjectLabel });
 <BaseLayout
   locale="ar"
   title={fmt(copy['meta.gradeSubjectTitle'], { grade: gradeLabel, subject: subjectLabel })}
-  description={fmt(copy['subjectsOf'], { grade: gradeLabel })}
+  description={fmt(copy['subjectPageDescription'], { grade: gradeLabel, subject: subjectLabel })}
   pathname={`/ar/grades/${gradeSlug}/subjects/${subjectSlug}/`}
 >
   <section class="section">

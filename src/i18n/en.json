@@ -189,6 +189,13 @@
   "meta.termsTitle": "Terms — EduVerse",
   "meta.contactTitle": "Contact — EduVerse",
   "meta.gradeSubjectTitle": "{grade} · {subject} — EduVerse",
+  "meta.loginDesc": "Log in with your EduID to pick up where you left off across every grade and subject.",
+  "meta.signupDesc": "Create your free EduID to save progress, bookmark lessons, and keep your study in one place.",
+  "meta.forgotDesc": "Send a secure reset link to your EduID email and get back into your account.",
+  "meta.resetDesc": "Choose a new password for your EduID. Nothing else about your account changes.",
+  "meta.verifyDesc": "Confirming your EduID email address. This page closes itself when you are done.",
+  "meta.welcomeDesc": "Your EduID is ready. Here is where to go next.",
+  "meta.dashboardDesc": "Your EduVerse dashboard: continue learning, saved lessons, and progress.",
   "auth.eyebrow": "YOUR EDUID",
   "app.notFound": "This page took a wrong turn.",
   "app.notFoundSub": "The link may be old, or the page may have moved.",
@@ -240,6 +247,7 @@
   "level.prep": "Preparatory",
   "level.secondary": "Secondary",
   "subjectsOf": "Subjects in {grade}",
+  "subjectPageDescription": "All {subject} resources for {grade} on the Egyptian Ministry curriculum: notes, exercises, and revision help in one calm place.",
   "catalog.emptySubject": "No subjects in this grade yet.",
   "catalog.askChatNote": "Not sure where to start? EduChat can plan the grade with you."
 }

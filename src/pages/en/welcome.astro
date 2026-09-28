@@ -6,7 +6,7 @@ const copy = getDictionary('en');
 const t = (key: string) => copy[key as keyof typeof copy];
 ---
 
-<BaseLayout locale="en" title={t('meta.welcomeTitle')} pathname="/en/welcome/" compactHeader>
+  <BaseLayout locale="en" title={t('meta.welcomeTitle')} pathname="/en/welcome/" compactHeader noindex>
   <section class="section welcome">
     <div class="container welcome__inner">
       <span class="logo-card">

@@ -33,6 +33,7 @@ const t = (key: string) => copy[key as keyof typeof copy];
   pathname={pathname}
   showCookieBanner={showCookieBanner}
   bodyClass="app-body"
+  noindex
 >
   {/* Starts locked: identity is checked before the private shell is revealed, so
       a signed-out visitor never sees it flash before being gated. */}
