@@ -1,0 +1,6 @@
+# Cloudflare Pages redirects.
+# The root sends visitors to the default locale with a real 302 so crawlers
+# follow it, instead of a meta refresh. src/pages/index.astro still ships the
+# English landing plus a no-JS Arabic link as the fallback if these rules are
+# ever removed.
+/    /en/    302
