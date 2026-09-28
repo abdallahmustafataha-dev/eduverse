@@ -1,0 +1,71 @@
+/* EduVerse Students — starter tokens.
+   RULE #1 (logo floats, never melts): page backgrounds stay a SHADE away
+   from the logo colors (deeper cream #EFE3D2 or lighter #FCFAF4). The maroon
+   mark always sits on a contrasting card. Never maroon-on-maroon.
+   RULE #2 (mobile): classic `@media (max-width: …)` ONLY. Range syntax
+   `@media (width<=…)` is ignored by older phones. See brief/06-mobile.md. */
+:root {
+  --bg: #f5f1e8;
+  --bg-deep: #efe3d2;
+  --bg-light: #fcfaf4;
+  --card: #fffbf5;
+  --fg: #7f1d1d;
+  --fg-soft: #5a2323;
+  --muted: #8a6b6b;
+  --border: #e4d9c8;
+  --radius-lg: 16px;
+  --font-en: Georgia, "Times New Roman", serif;
+  --font-body-en: Inter, system-ui, sans-serif;
+  --font-ar: "IBM Plex Sans Arabic", Tahoma, sans-serif;
+}
+[data-theme="dark"] {
+  --bg: #7f1d1d;
+  --bg-deep: #5f1717;
+  --bg-light: #932929;
+  --card: #6b2020;
+  --fg: #f5f1e8;
+  --fg-soft: #f0e2d2;
+  --muted: #d9b8a8;
+  --border: #5a1a1a;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-body-en);
+  font-size: 16px;
+  line-height: 1.6;
+}
+html[dir="rtl"] body { font-family: var(--font-ar); }
+h1, h2, h3 { font-family: var(--font-en); }
+html[dir="rtl"] h1, html[dir="rtl"] h2, html[dir="rtl"] h3 { font-family: var(--font-ar); }
+.wrap { max-width: 1200px; margin: 0 auto; padding: 0 24px; }
+img { max-width: 100%; }
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  min-height: 3rem;
+  padding: 0.72rem 1.4rem;
+  border-radius: 10px;
+  font-weight: 800;
+  text-decoration: none;
+}
+.btn-primary { background: var(--fg); color: var(--bg); }
+.btn-secondary { border: 1.5px solid var(--fg); color: var(--fg); }
+.logo-card {
+  background: #fffbf5;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 20px;
+  display: inline-block;
+}
+@media (max-width: 760px) {
+  .hero-grid { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 560px) {
+  .btn { width: 100%; }
+  h1 { overflow-wrap: break-word; }
+}

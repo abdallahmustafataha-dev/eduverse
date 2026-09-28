@@ -1,0 +1,34 @@
+---
+import en from '../../i18n/en.json';
+import { supabase } from '../../lib/supabase';
+import '../../styles/tokens.css';
+
+// Scaffold starter: proves DB wiring on day one. The human dev expands this
+// into the full "Student Journey" hero per brief/01-landing.md.
+const { data: grades } = await supabase.from('grades').select('slug,name_en').order('sort_order');
+const { count: subjectCount } = await supabase.from('subjects').select('id', { count: 'exact', head: true });
+---
+<html lang="en" dir="ltr" data-theme="light">
+<head>
+<meta charset="utf-8" /><meta name="viewport" content="width=device-width" />
+<title>EduVerse — {en['hero.title']}</title>
+<meta name="description" content={en['meta.description']} />
+<link rel="icon" type="image/svg+xml" href="/eduverse-logos/eduverse-light.svg" />
+</head>
+<body>
+<main class="wrap">
+<p>{en['hero.eyebrow']}</p>
+<h1>{en['hero.title']}</h1>
+<p>{en['hero.sub']}</p>
+<p>
+<a class="btn btn-primary" href="/en/signup/">{en['hero.cta1']}</a>
+<a class="btn btn-secondary" href="#grades">{en['hero.cta2']}</a>
+</p>
+<p>{grades?.length ?? 0} grades · {subjectCount ?? 0} subjects · Egyptian curricula only.</p>
+<h2 id="grades">Grades</h2>
+<ul>
+{(grades ?? []).map((g) => <li><a href={`/en/grades/${g.slug}/`}>{g.name_en}</a></li>)}
+</ul>
+</main>
+</body>
+</html>

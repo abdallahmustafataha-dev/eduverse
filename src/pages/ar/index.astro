@@ -1,0 +1,33 @@
+---
+import ar from '../../i18n/ar.json';
+import { supabase } from '../../lib/supabase';
+import '../../styles/tokens.css';
+
+// Starter scaffold — see brief/01-landing.md for the full spec.
+const { data: grades } = await supabase.from('grades').select('slug,name_ar').order('sort_order');
+const { count: subjectCount } = await supabase.from('subjects').select('id', { count: 'exact', head: true });
+---
+<html lang="ar" dir="rtl" data-theme="light">
+<head>
+<meta charset="utf-8" /><meta name="viewport" content="width=device-width" />
+<title>EduVerse — {ar['hero.title']}</title>
+<meta name="description" content={ar['meta.description']} />
+<link rel="icon" type="image/svg+xml" href="/eduverse-logos/eduverse-light.svg" />
+</head>
+<body>
+<main class="wrap">
+<p>{ar['hero.eyebrow']}</p>
+<h1>{ar['hero.title']}</h1>
+<p>{ar['hero.sub']}</p>
+<p>
+<a class="btn btn-primary" href="/ar/signup/">{ar['hero.cta1']}</a>
+<a class="btn btn-secondary" href="#grades">{ar['hero.cta2']}</a>
+</p>
+<p>{grades?.length ?? 0} صف · {subjectCount ?? 0} مادة · مناهج مصرية فقط.</p>
+<h2 id="grades">الصفوف</h2>
+<ul>
+{(grades ?? []).map((g) => <li><a href={`/ar/grades/${g.slug}/`}>{g.name_ar}</a></li>)}
+</ul>
+</main>
+</body>
+</html>
