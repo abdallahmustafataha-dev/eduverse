@@ -4,14 +4,12 @@ import { getDictionary } from '../../lib/copy';
 
 const copy = getDictionary('en');
 const t = (key: string) => copy[key as keyof typeof copy];
-
-const PARAGRAPHS = ['legal.privacyP1', 'legal.privacyP2', 'legal.privacyP3', 'legal.privacyP4'];
 ---
 
 <BaseLayout
   locale="en"
   title={t('meta.privacyTitle')}
-  description={t('legal.privacyLead')}
+  description={t('legal.privacyBody')}
   pathname="/en/privacy/"
 >
   <section class="section">
@@ -19,12 +17,10 @@ const PARAGRAPHS = ['legal.privacyP1', 'legal.privacyP2', 'legal.privacyP3', 'le
       <div class="section__head">
         <p class="eyebrow">{t('nav.home')}</p>
         <h1>{t('legal.privacyTitle')}</h1>
-        <p class="section__lead">{t('legal.privacyLead')}</p>
-        <p class="todo-note">{t('legal.placeholderNote')}</p>
       </div>
 
       <div class="prose">
-        {PARAGRAPHS.map((key) => <p>{t(key)}</p>)}
+        <p>{t('legal.privacyBody')}</p>
       </div>
     </div>
   </section>

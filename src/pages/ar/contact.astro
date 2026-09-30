@@ -11,7 +11,7 @@ const EMAIL = 'abdallah.mustafa.taha@gmail.com';
 <BaseLayout
   locale="ar"
   title={t('meta.contactTitle')}
-  description={t('legal.contactLead')}
+  description={t('legal.contactBody')}
   pathname="/ar/contact/"
 >
   <section class="section">
@@ -19,7 +19,10 @@ const EMAIL = 'abdallah.mustafa.taha@gmail.com';
       <div class="section__head">
         <p class="eyebrow">{t('nav.home')}</p>
         <h1>{t('legal.contactTitle')}</h1>
-        <p class="section__lead">{t('legal.contactLead')}</p>
+      </div>
+
+      <div class="prose">
+        <p>{t('legal.contactBody')}</p>
       </div>
 
       <div class="card empty-state">
@@ -27,7 +30,6 @@ const EMAIL = 'abdallah.mustafa.taha@gmail.com';
         <p>
           <a class="link" href={`mailto:${EMAIL}`}>{EMAIL}</a>
         </p>
-        <p class="empty-state__note">{t('legal.contactResponse')}</p>
       </div>
     </div>
   </section>
