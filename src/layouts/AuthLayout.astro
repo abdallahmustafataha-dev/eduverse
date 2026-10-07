@@ -41,11 +41,16 @@ const t = (key: string) => copy[key as keyof typeof copy];
           data-light="/eduverse-logos/eduverse-light.svg"
           data-dark="/eduverse-logos/eduverse-dark.svg"
           src="/eduverse-logos/eduverse-light.svg"
-          width="260"
+          width="220"
           alt={copy['hero.logoAlt']}
         />
       </span>
       <p class="auth__promise">{t('auth.promise')}</p>
+      <ul class="auth__points">
+        <li>{t('auth.point1')}</li>
+        <li>{t('auth.point2')}</li>
+        <li>{t('auth.point3')}</li>
+      </ul>
       <p>
         <a class="link-quiet" href={localePath(locale)}>
           ← {t('nav.home')}
