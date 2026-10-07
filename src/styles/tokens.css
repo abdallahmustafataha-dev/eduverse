@@ -2541,3 +2541,153 @@ html[dir="rtl"] .subject-card__name {
     height: 116px;
   }
 }
+
+/* ===========================================================================
+   21. PLAYFUL REDESIGN (owner-approved: playful student style, LOGO fixed).
+   A single override layer at END of file so it wins every cascade.
+   Classic `@media (max-width: …)` ONLY (brief/06-mobile). No range syntax.
+   The maroon/paper logo always sits on a contrasting card (RULE #1) —
+   backgrounds below only shift the family shade, never touch the mark.
+   =========================================================================== */
+:root {
+  --bg: #faf3e5;
+  --bg-deep: #f3e2c4;
+  --bg-light: #fffdf6;
+  --card: #fffdf6;
+  --fg: #7f1d1d;
+  --fg-soft: #5a2323;
+  --muted: #8a6b6b;
+  --border: #e4d9c8;
+  --border-strong: #d6c6ae;
+
+  /* Playful accents (new — logo untouched) */
+  --gold: #d99a06;
+  --gold-soft: #fbeed3;
+  --gold-ink: #5c3d05;
+  --teal: #0e7c6b;
+  --teal-soft: #dcf0e9;
+  --coral: #e4572e;
+
+  --font-en: "Cairo", Georgia, "Times New Roman", serif;
+  --font-ar: "Cairo", "IBM Plex Sans Arabic", Tahoma, sans-serif;
+
+  --radius-lg: 20px;
+  --radius-xl: 26px;
+  --shadow-pop: 0 5px 0 rgba(127, 29, 29, 0.9);
+  --shadow-pop-sm: 0 3px 0 rgba(127, 29, 29, 0.9);
+}
+
+[data-theme="dark"] {
+  --bg: #2b0f14;
+  --bg-deep: #230c11;
+  --bg-light: #3a151c;
+  --card: #431a21;
+  --fg: #f7e8d5;
+  --fg-soft: #f0dcc4;
+  --muted: #d9b8a8;
+  --border: #5a2326;
+  --border-strong: #7a3335;
+
+  --gold: #f2b705;
+  --gold-soft: #4d3a08;
+  --gold-ink: #ffe9ad;
+  --teal: #2dd4bf;
+  --teal-soft: #0f3d37;
+
+  --shadow-pop: 0 5px 0 rgba(0, 0, 0, 0.55);
+  --shadow-pop-sm: 0 3px 0 rgba(0, 0, 0, 0.55);
+}
+
+/* Punchy display type (Cairo Black loaded in BaseLayout) */
+h1 {
+  font-weight: 900;
+  letter-spacing: -0.02em;
+}
+
+/* Marker-swash kickers */
+.eyebrow {
+  background: linear-gradient(transparent 58%, var(--gold-soft) 58%);
+  padding-inline: 6px;
+}
+
+/* Chunky press-me buttons */
+.btn {
+  border-radius: 14px;
+}
+.btn--primary {
+  box-shadow: var(--shadow-pop);
+}
+.btn--primary:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 7px 0 rgba(127, 29, 29, 0.9);
+}
+[data-theme="dark"] .btn--primary:hover:not(:disabled) {
+  box-shadow: 0 7px 0 rgba(0, 0, 0, 0.55);
+}
+.btn--primary:active:not(:disabled) {
+  transform: translateY(4px);
+  box-shadow: 0 1px 0 rgba(127, 29, 29, 0.9);
+}
+[data-theme="dark"] .btn--primary:active:not(:disabled) {
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.55);
+}
+
+/* Sticker chips */
+.app-chip {
+  transform: rotate(-2deg);
+}
+
+/* Cards with a little tilt on hover */
+.app-card,
+.ambition-card,
+.goal {
+  border-radius: 20px;
+}
+.app-card:hover,
+.ambition-card:hover {
+  transform: translateY(-5px) rotate(-0.4deg);
+}
+
+/* Reached stations go gold */
+.station.is-reached .station__core {
+  fill: var(--gold);
+}
+.station.is-reached .station__ring {
+  stroke: var(--gold);
+}
+.journey__counter {
+  background: var(--gold-soft);
+  color: var(--gold-ink);
+}
+
+/* Sunny hero wash */
+.hero {
+  background:
+    radial-gradient(55% 42% at 50% 0%, var(--gold-soft), transparent),
+    var(--bg-deep);
+}
+
+/* Gold form focus */
+.form-field input:focus {
+  border-color: var(--gold);
+  box-shadow: 0 0 0 3px var(--gold-soft);
+}
+
+/* Playful footer ribbon */
+.site-footer {
+  border-top: 4px solid var(--gold);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .btn--primary:hover:not(:disabled),
+  .app-card:hover,
+  .ambition-card:hover {
+    transform: none;
+  }
+}
+
+@media (max-width: 560px) {
+  .app-chip {
+    transform: rotate(-1deg);
+  }
+}

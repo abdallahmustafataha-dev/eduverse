@@ -53,8 +53,8 @@ const beacon = import.meta.env.PUBLIC_CF_BEACON_TOKEN as string | undefined;
     <meta name="description" content={desc} />
     {noindex && <meta name="robots" content="noindex, nofollow" />}
     <link rel="canonical" href={canonical} />
-    <meta name="theme-color" content="#F5F1E8" media="(prefers-color-scheme: light)" />
-    <meta name="theme-color" content="#7F1D1D" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#faf3e5" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#2b0f14" media="(prefers-color-scheme: dark)" />
 
     <!-- Favicon set (checklist A6) -->
     <link rel="icon" type="image/svg+xml" href="/eduverse-logos/eduverse-light.svg" />
@@ -63,6 +63,12 @@ const beacon = import.meta.env.PUBLIC_CF_BEACON_TOKEN as string | undefined;
     <link rel="manifest" href="/site.webmanifest" />
     <meta name="application-name" content="EduVerse" />
     <meta name="apple-mobile-web-app-title" content="EduVerse" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&display=swap"
+      rel="stylesheet"
+    />
 
     <!-- Open Graph (checklist A5) -->
     <meta property="og:type" content="website" />
