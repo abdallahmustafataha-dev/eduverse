@@ -1,0 +1,934 @@
+.c-page {
+  --c-bg: #fcfaf4;
+  --c-bg-alt: #f5efe2;
+  --c-fg: #7f1d1d;
+  --c-body: #6b4a4a;
+  --c-muted: #8a6b6b;
+  --c-card: #ffffff;
+  --c-border: #e8dcc6;
+  --c-accent: #8a6a1f;
+  --c-gold: #c9a227;
+  --c-solid-bg: #7f1d1d;
+  --c-solid-fg: #f5f1e8;
+  --c-ink: #3a2c08;
+  --c-shadow: 0 4px 16px rgba(127, 29, 29, 0.08);
+  --c-shadow-lift: 0 18px 44px -18px rgba(127, 29, 29, 0.3);
+  --c-mark-shadow: rgba(138, 106, 31, 0.34);
+  --c-measure: 68ch;
+
+  --hero-bg: var(--c-bg);
+  --hero-fg: var(--c-fg);
+  --hero-body: var(--c-body);
+  --hero-card: var(--c-card);
+  --hero-border: var(--c-border);
+  --hero-accent: var(--c-accent);
+  --hero-gold: var(--c-gold);
+  --hero-solid-bg: var(--c-solid-bg);
+  --hero-solid-fg: var(--c-solid-fg);
+  --logo-shadow: var(--c-mark-shadow);
+
+  background: var(--c-bg);
+  color: var(--c-body);
+}
+
+[data-theme="dark"] .c-page {
+  --c-bg: #1d0e0e;
+  --c-bg-alt: #261313;
+  --c-fg: #f5f1e8;
+  --c-body: #e2cdcd;
+  --c-muted: #c0a3a3;
+  --c-card: #2a1414;
+  --c-border: #4a2323;
+  --c-accent: #d9b45a;
+  --c-gold: #c9a227;
+  --c-solid-bg: #f5f1e8;
+  --c-solid-fg: #2c1616;
+  --c-ink: #241a05;
+  --c-shadow: 0 4px 16px rgba(0, 0, 0, 0.34);
+  --c-shadow-lift: 0 18px 44px -18px rgba(0, 0, 0, 0.66);
+  --c-mark-shadow: rgba(0, 0, 0, 0.6);
+}
+
+.c-page .hero--c {
+  --hero-bg: var(--c-bg);
+  --hero-fg: var(--c-fg);
+  --hero-body: var(--c-body);
+  --hero-card: var(--c-card);
+  --hero-border: var(--c-border);
+  --hero-accent: var(--c-accent);
+  --hero-gold: var(--c-gold);
+  --hero-solid-bg: var(--c-solid-bg);
+  --hero-solid-fg: var(--c-solid-fg);
+
+  height: auto;
+  min-height: 640px;
+  border-block-end: 1px solid var(--c-border);
+}
+
+.c-page .hero--c .hero__inner {
+  height: auto;
+  min-height: 640px;
+}
+
+.c-page .hero--c .hero__title {
+  font-size: clamp(30px, 5.4cqw, 62px);
+  letter-spacing: -0.025em;
+}
+
+.c-page .hero--c .hero__sub {
+  font-size: clamp(14px, 1.4cqw, 18px);
+  max-width: 48ch;
+}
+
+.c-page .hero--c .hero__logo-card {
+  --logo-shadow: var(--c-mark-shadow);
+  width: clamp(34px, 4cqw, 46px);
+  height: clamp(34px, 4cqw, 46px);
+}
+
+/* ---------------------------------------------------------------- the road */
+
+.c-page .road {
+  padding-block: clamp(20px, 3.4cqw, 44px) clamp(18px, 2.6cqw, 34px);
+}
+
+.c-page .road__stage {
+  --p: 0.08;
+  display: grid;
+  gap: clamp(14px, 2.2cqw, 30px);
+  width: min(100%, 1180px);
+  margin-inline: auto;
+}
+
+.c-page .road__head {
+  display: grid;
+  justify-items: center;
+  gap: clamp(6px, 1cqw, 12px);
+  text-align: center;
+}
+
+.c-page .road__head .hero__sub {
+  margin-inline: auto;
+}
+
+.c-page .road__head .hero__title {
+  text-wrap: balance;
+}
+
+.c-page .road__map {
+  position: relative;
+  padding-inline: clamp(34px, 5cqw, 60px);
+}
+
+.c-page .road__svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+
+.c-page .road__bed,
+.c-page .road__ink {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.c-page .road__bed {
+  stroke: color-mix(in srgb, var(--c-fg) 9%, transparent);
+  stroke-width: 22;
+}
+
+.c-page .road__ink {
+  stroke: var(--c-fg);
+  stroke-width: 6;
+  stroke-dasharray: 1000;
+  stroke-dashoffset: calc(1000 * (1 - var(--p, 0)));
+}
+
+.c-page .road__nodes {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.c-page .road__node {
+  /* --lit is pure CSS: station i lights once the drawn road reaches it.
+     The offset keeps station 1 lit from the very first frame, matching the
+     counter, which reads "Station 1 of 12" at rest. */
+  --lit: clamp(0, calc((var(--p, 0) * 12) - var(--i) + 1), 1);
+  position: absolute;
+  left: var(--x);
+  top: var(--y);
+  translate: -50% -50%;
+  display: grid;
+  justify-items: center;
+  opacity: calc(0.4 + 0.6 * var(--lit));
+  transition: opacity 0.35s ease;
+}
+
+.c-page .road__dot {
+  position: relative;
+  width: clamp(11px, 1.15cqw, 15px);
+  height: clamp(11px, 1.15cqw, 15px);
+  border-radius: 50%;
+  border: 2px solid var(--c-fg);
+  background: var(--c-card);
+  box-shadow: 0 0 0 4px var(--c-bg);
+}
+
+.c-page .road__dot::after {
+  content: "";
+  position: absolute;
+  inset: 1px;
+  border-radius: 50%;
+  background: var(--c-gold);
+  scale: var(--lit);
+  transition: scale 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+/* Out of flow, so the node box stays dot-sized and the dot lands exactly on the
+   station instead of being pushed sideways by its own label. */
+.c-page .road__label {
+  position: absolute;
+  inset-inline-start: calc(100% + 9px);
+  top: 50%;
+  translate: 0 -50%;
+  max-width: 8em;
+  font-family: var(--font-ui-ar);
+  font-size: clamp(9px, 0.82cqw, 11px);
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  line-height: 1.25;
+  white-space: nowrap;
+  color: var(--c-muted);
+  text-align: start;
+}
+
+/* The station at the far end of the road would push its label off the page, so
+   it reads back toward the road instead. */
+.c-page .road__node:last-child .road__label {
+  inset-inline-start: auto;
+  inset-inline-end: calc(100% + 9px);
+  text-align: end;
+}
+
+[dir="rtl"] .c-page .road__node:first-child .road__label {
+  inset-inline-start: auto;
+  inset-inline-end: calc(100% + 9px);
+  text-align: end;
+}
+
+[lang="en"] .c-page .road__label {
+  font-family: var(--font-ui-en);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.c-page .road__node:first-child .road__label,
+.c-page .road__node:last-child .road__label {
+  color: var(--c-fg);
+}
+
+.c-page .road__end {
+  display: grid;
+  justify-items: center;
+  gap: clamp(8px, 1.3cqw, 16px);
+  text-align: center;
+}
+
+.c-page .road__counter {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 13px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--c-gold) 42%, transparent);
+  background: color-mix(in srgb, var(--c-gold) 10%, transparent);
+  color: var(--c-fg);
+  font-family: var(--font-ui-ar);
+  font-size: clamp(10px, 0.95cqw, 12px);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+[lang="en"] .c-page .road__counter {
+  font-family: var(--font-ui-en);
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.c-page .road__end .hero__stats {
+  justify-content: center;
+  border-block-start: 0;
+  padding-block-start: 0;
+}
+
+.c-page .road__end .hero__actions {
+  justify-content: center;
+}
+
+.c-page .road__end .hero__footnote {
+  margin: 0;
+}
+
+/* Below the fold the road runs down the page instead of across it. */
+@media (max-width: 760px) {
+  .c-page .road__map {
+    padding-inline: clamp(18px, 4vw, 30px);
+  }
+
+  .c-page .road__label {
+    max-width: 7em;
+    white-space: normal;
+  }
+
+  .c-page .road__bed {
+    stroke-width: 18;
+  }
+
+  .c-page .road__ink {
+    stroke-width: 5;
+  }
+}
+
+.c-page .hero__stats {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: clamp(8px, 1.6cqw, 20px);
+  padding-block-start: clamp(6px, 1.2cqw, 14px);
+  border-block-start: 1px solid var(--c-border);
+}
+
+.c-page .hero__stat {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  color: var(--c-muted);
+  font-size: clamp(10px, 1.1cqw, 13px);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.c-page .hero__stat b {
+  font-family: var(--font-display-en);
+  font-size: clamp(15px, 1.9cqw, 22px);
+  font-weight: 700;
+  line-height: 1;
+  color: var(--c-gold);
+}
+
+[dir="rtl"] .c-page .hero__stat b {
+  font-family: var(--font-display-ar);
+}
+
+.c-page .skip {
+  position: absolute;
+  inset-block-start: -60px;
+  inset-inline-start: 12px;
+  z-index: 60;
+  padding: 10px 16px;
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+  color: var(--c-solid-fg);
+  background: var(--c-solid-bg);
+  border-radius: var(--r-md);
+  transition: inset-block-start var(--t-fast) var(--ease-out);
+}
+
+.c-page .skip:focus {
+  inset-block-start: 12px;
+}
+
+.mark {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  box-shadow: 0 4px 12px -6px var(--c-mark-shadow);
+}
+
+.mark__img {
+  grid-area: 1 / 1;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.mark__img--on-dark {
+  display: none;
+}
+
+[data-theme="dark"] .mark__img--on-light {
+  display: none;
+}
+
+[data-theme="dark"] .mark__img--on-dark {
+  display: block;
+}
+
+.mark--lg {
+  width: clamp(44px, 6vw, 60px);
+  height: clamp(44px, 6vw, 60px);
+}
+
+/* ------------------------------------------------------------------ navbar
+   Two states. At rest it is a full-bleed bar, which is what the top of the page
+   wants. Past 50px of scroll it insets itself and hands its surface to
+   .site__inner, so the bar can round into a floating pill without the
+   full-width backdrop-filter smearing a blurred band across the viewport. */
+
+.site {
+  --t-nav: 300ms;
+  position: sticky;
+  inset-block-start: 0;
+  z-index: 40;
+  background: color-mix(in srgb, var(--c-bg) 88%, transparent);
+  border-block-end: 1px solid var(--c-border);
+  backdrop-filter: blur(10px);
+  transition:
+    padding var(--t-nav) ease-in-out,
+    background-color var(--t-nav) ease-in-out,
+    border-color var(--t-nav) ease-in-out;
+}
+
+.site__inner {
+  display: flex;
+  align-items: center;
+  gap: clamp(10px, 2vw, 28px);
+  max-width: 1200px;
+  margin-inline: auto;
+  padding: 12px clamp(16px, 4vw, 40px);
+  transition:
+    padding var(--t-nav) ease-in-out,
+    border-radius var(--t-nav) ease-in-out,
+    background-color var(--t-nav) ease-in-out,
+    border-color var(--t-nav) ease-in-out,
+    box-shadow var(--t-nav) ease-in-out;
+}
+
+.site.is-scrolled {
+  padding: 10px clamp(10px, 2vw, 20px);
+  background: transparent;
+  border-block-end-color: transparent;
+  backdrop-filter: none;
+}
+
+.site.is-scrolled .site__inner {
+  padding: 6px clamp(10px, 1.6vw, 18px);
+  border: 1px solid var(--c-border);
+  border-radius: var(--r-pill);
+  background: color-mix(in srgb, var(--c-bg) 92%, transparent);
+  box-shadow: var(--c-shadow-lift);
+  backdrop-filter: blur(10px);
+}
+
+.site__brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-decoration: none;
+  transition: gap var(--t-nav) ease-in-out;
+}
+
+/* Collapses width as well as opacity, so the name slides away instead of
+   blinking out and leaving a hole next to the mark. */
+.site__wordmark {
+  max-width: 12rem;
+  overflow: hidden;
+  white-space: nowrap;
+  opacity: 1;
+  font-family: var(--font-display-en);
+  font-size: 19px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--c-fg);
+  transition:
+    opacity var(--t-nav) ease-in-out,
+    max-width var(--t-nav) ease-in-out;
+}
+
+.site.is-scrolled .site__brand {
+  gap: 0;
+}
+
+.site.is-scrolled .site__wordmark {
+  max-width: 0;
+  opacity: 0;
+}
+
+[dir="rtl"] .site__wordmark {
+  font-family: var(--font-display-ar);
+}
+
+.site__nav {
+  display: none;
+  align-items: center;
+  gap: clamp(10px, 1.8vw, 24px);
+  margin-inline-end: auto;
+}
+
+.site__link {
+  font-size: 14px;
+  font-weight: 500;
+  text-decoration: none;
+  color: var(--c-body);
+  transition: color var(--t-fast) var(--ease-out);
+}
+
+.site__link:hover {
+  color: var(--c-accent);
+}
+
+.site__tools {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-inline-start: auto;
+}
+
+.ctl {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px;
+  background: var(--c-card);
+  border: 1px solid var(--c-border);
+  border-radius: var(--r-pill);
+}
+
+.ctl__btn {
+  min-height: 30px;
+  padding-inline: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  text-decoration: none;
+  color: var(--c-muted);
+  background: transparent;
+  border: 0;
+  border-radius: var(--r-pill);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color var(--t-fast) var(--ease-out),
+    background-color var(--t-fast) var(--ease-out);
+}
+
+.ctl__btn[aria-pressed="true"] {
+  color: var(--c-solid-fg);
+  background: var(--c-solid-bg);
+}
+
+.ctl__btn--go {
+  display: none;
+  color: var(--c-solid-fg);
+  background: var(--c-solid-bg);
+}
+
+.section {
+  container-type: inline-size;
+  padding-block: clamp(52px, 9vw, 104px);
+  padding-inline: clamp(16px, 4vw, 40px);
+  border-block-end: 1px solid var(--c-border);
+}
+
+.section__inner {
+  max-width: 1200px;
+  margin-inline: auto;
+}
+
+.section--alt {
+  background: var(--c-bg-alt);
+}
+
+.section__head {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: var(--c-measure);
+  margin-block-end: clamp(28px, 4.5vw, 56px);
+}
+
+.kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-size: clamp(10px, 1.5vw, 12px);
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--c-accent);
+}
+
+.kicker::before {
+  content: "";
+  width: clamp(20px, 3vw, 34px);
+  height: 1px;
+  background: currentColor;
+  opacity: 0.55;
+}
+
+[dir="rtl"] .kicker::before {
+  order: 2;
+}
+
+.section__title {
+  font-family: var(--font-display-en);
+  font-size: clamp(24px, 3.6vw, 42px);
+  font-weight: 600;
+  line-height: 1.08;
+  letter-spacing: -0.022em;
+  text-wrap: balance;
+  color: var(--c-fg);
+}
+
+[dir="rtl"] .section__title {
+  font-family: var(--font-display-ar);
+  letter-spacing: 0;
+}
+
+.section__lede {
+  font-size: clamp(14px, 1.5vw, 17px);
+  line-height: 1.6;
+  color: var(--c-muted);
+}
+
+.goals {
+  display: grid;
+  gap: clamp(12px, 1.8vw, 22px);
+}
+
+.goal {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: clamp(18px, 2.4vw, 30px);
+  background: var(--c-card);
+  border: 1px solid var(--c-border);
+  border-radius: var(--r-lg);
+  box-shadow: var(--c-shadow);
+  transition: transform var(--t-base) var(--ease-out),
+    box-shadow var(--t-base) var(--ease-out),
+    border-color var(--t-base) var(--ease-out);
+}
+
+.goal:hover {
+  transform: translateY(-3px);
+  border-color: color-mix(in srgb, var(--c-gold) 55%, var(--c-border));
+  box-shadow: var(--c-shadow-lift);
+}
+
+.goal__num {
+  font-family: var(--font-display-en);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  color: var(--c-gold);
+}
+
+.goal__text {
+  font-size: clamp(15px, 1.6vw, 18px);
+  line-height: 1.5;
+  font-weight: 500;
+  color: var(--c-fg);
+}
+
+.founder {
+  display: grid;
+  gap: clamp(22px, 4vw, 52px);
+  align-items: center;
+}
+
+.founder__slot {
+  display: grid;
+  place-items: center;
+  gap: 10px;
+  aspect-ratio: 4 / 5;
+  padding: 20px;
+  text-align: center;
+  background: var(--c-card);
+  border: 1.5px dashed color-mix(in srgb, var(--c-accent) 42%, var(--c-border));
+  border-radius: var(--r-lg);
+}
+
+.founder__glyph {
+  color: color-mix(in srgb, var(--c-accent) 55%, transparent);
+}
+
+.founder__slotnote {
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.45;
+  color: var(--c-muted);
+}
+
+.founder__name {
+  font-family: var(--font-display-en);
+  font-size: clamp(21px, 2.6vw, 30px);
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  color: var(--c-fg);
+}
+
+[dir="rtl"] .founder__name {
+  font-family: var(--font-display-ar);
+}
+
+.founder__role {
+  display: inline-block;
+  margin-block-start: 6px;
+  padding: 3px 11px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--c-ink);
+  background: var(--c-gold);
+  border-radius: var(--r-pill);
+}
+
+.founder__text {
+  margin-block-start: 16px;
+  font-size: clamp(14px, 1.6vw, 18px);
+  line-height: 1.62;
+  color: var(--c-body);
+  max-width: 56ch;
+}
+
+.final {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: clamp(14px, 2vw, 22px);
+  max-width: 640px;
+  margin-inline: auto;
+  text-align: center;
+}
+
+.final .kicker::before {
+  display: none;
+}
+
+.final__title {
+  font-family: var(--font-display-en);
+  font-size: clamp(28px, 4.4vw, 50px);
+  font-weight: 600;
+  line-height: 1.05;
+  letter-spacing: -0.025em;
+  text-wrap: balance;
+  color: var(--c-fg);
+}
+
+[dir="rtl"] .final__title {
+  font-family: var(--font-display-ar);
+  letter-spacing: 0;
+}
+
+.final__sub {
+  font-size: clamp(14px, 1.5vw, 17px);
+  color: var(--c-muted);
+  max-width: 46ch;
+}
+
+.final__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px;
+  margin-block-start: 6px;
+}
+
+.foot {
+  padding-block: clamp(36px, 6vw, 64px) clamp(28px, 4vw, 40px);
+  background: var(--c-bg-alt);
+  color: var(--c-body);
+}
+
+.foot__inner {
+  container-type: inline-size;
+  display: grid;
+  gap: clamp(26px, 4vw, 44px);
+  max-width: 1200px;
+  margin-inline: auto;
+  padding-inline: clamp(16px, 4vw, 40px);
+}
+
+.foot__brand {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: 34ch;
+}
+
+.foot__note {
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--c-muted);
+}
+
+.foot__cols {
+  display: grid;
+  gap: clamp(20px, 3vw, 32px);
+}
+
+.foot__title {
+  margin-block-end: 12px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--c-accent);
+}
+
+.foot__list {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.foot__link {
+  font-size: 14px;
+  text-decoration: none;
+  color: var(--c-body);
+  transition: color var(--t-fast) var(--ease-out);
+}
+
+.foot__link:hover {
+  color: var(--c-accent);
+}
+
+.foot__link--tbd {
+  color: var(--c-muted);
+  font-style: italic;
+}
+
+.foot__bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  max-width: 1200px;
+  margin-inline: auto;
+  margin-block-start: clamp(26px, 4vw, 44px);
+  padding-inline: clamp(16px, 4vw, 40px);
+  padding-block-start: 20px;
+  border-block-start: 1px solid var(--c-border);
+  font-size: 12.5px;
+  color: var(--c-muted);
+}
+
+.foot__legal {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.sticky {
+  position: fixed;
+  inset-block-end: 0;
+  inset-inline: 0;
+  z-index: 50;
+  display: flex;
+  gap: 10px;
+  padding: 10px clamp(12px, 4vw, 20px);
+  background: color-mix(in srgb, var(--c-bg) 94%, transparent);
+  border-block-start: 1px solid var(--c-border);
+  backdrop-filter: blur(10px);
+  translate: 0 100%;
+  transition: translate var(--t-base) var(--ease-out);
+}
+
+.sticky.is-up {
+  translate: 0 0;
+}
+
+.sticky__btn {
+  flex: 1;
+  min-height: 46px;
+  font-size: 15px;
+}
+
+@container (min-width: 560px) {
+  .goals {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .foot__cols {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@container (min-width: 720px) {
+  .founder {
+    grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+  }
+}
+
+@media (min-width: 760px) {
+  .site__nav {
+    display: flex;
+  }
+
+  .ctl__btn--go {
+    display: inline-flex;
+    align-items: center;
+    padding-inline: 18px;
+    min-height: 36px;
+    font-size: 13px;
+  }
+
+  .sticky {
+    display: none;
+  }
+
+  .c-page .foot {
+    padding-block-end: clamp(28px, 4vw, 40px);
+  }
+}
+
+.c-page .foot {
+  padding-block-end: clamp(78px, 18vw, 96px);
+}
+
+[data-reveal] {
+  opacity: 0;
+  transform: translateY(16px);
+}
+
+.is-in [data-reveal] {
+  opacity: 1;
+  transform: none;
+  transition: opacity var(--t-slow) var(--ease-out),
+    transform var(--t-slow) var(--ease-out);
+}
+
+.is-in [data-reveal="1"] {
+  transition-delay: 60ms;
+}
+
+.is-in [data-reveal="2"] {
+  transition-delay: 130ms;
+}
+
+.is-in [data-reveal="3"] {
+  transition-delay: 200ms;
+}
+
+.is-in [data-reveal="4"] {
+  transition-delay: 270ms;
+}
+
+.c-page .hero--c .hero__stats {
+  opacity: 0;
+}
+
+.c-page .hero--c.is-in .hero__stats {
+  opacity: 1;
+  transition: opacity var(--t-slow) var(--ease-out) 370ms;
+}

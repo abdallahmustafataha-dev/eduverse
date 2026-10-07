@@ -1,0 +1,130 @@
+---
+/* /profile — brief/04-pages.md: EduID email + editable display name + XP +
+   streak + level (level = floor(xp/500)+1, client-side) + logout. */
+---
+
+<div>
+  <header class="app__head">
+    <h1 data-pf-title></h1>
+    <p class="app__lead" data-pf-email-label></p>
+  </header>
+
+  <section class="widget" aria-labelledby="pf-identity">
+    <h2 class="widget__title" id="pf-identity" data-pf-name-label></h2>
+
+    <p class="profile__email" data-pf-email dir="ltr"></p>
+
+    <form class="planner__add" data-pf-form>
+      <label class="sr-only" for="pf-name" data-pf-name-sr></label>
+      <input id="pf-name" name="display_name" type="text" data-pf-name />
+      <button type="submit" class="btn btn--primary" data-pf-save></button>
+    </form>
+    <p class="profile__status" data-pf-status role="status"></p>
+  </section>
+
+  <section class="widget" aria-labelledby="pf-stats">
+    <h2 class="widget__title" id="pf-stats" data-pf-stats></h2>
+    <dl class="stats">
+      <div class="stats__item">
+        <dt data-pf-xp></dt>
+        <dd data-pf-xp-value>0</dd>
+      </div>
+      <div class="stats__item">
+        <dt data-pf-streak></dt>
+        <dd data-pf-streak-value>0</dd>
+      </div>
+      <div class="stats__item">
+        <dt data-pf-level></dt>
+        <dd data-pf-level-value>1</dd>
+      </div>
+    </dl>
+  </section>
+
+  <section class="widget">
+    <button type="button" class="btn btn--ghost" data-pf-logout></button>
+  </section>
+</div>
+
+<script>
+  import { supabase } from '../../lib/supabase';
+  import { getDictionary, toArabicDigits } from '../../lib/copy';
+  import { localeFromDocument, authRedirect } from '../../lib/auth-ui';
+  import { logDetail } from '../../lib/site';
+  import { getUserStats, levelForXp } from '../../lib/xp';
+
+  const locale = localeFromDocument();
+  const copy = getDictionary(locale) as Record<string, string>;
+  const t = (k: string) => copy[k] ?? '';
+  const num = (n: number | string) => (locale === 'ar' ? toArabicDigits(n) : String(n));
+
+  const setText = (sel: string, value: string) => {
+    const node = document.querySelector<HTMLElement>(sel);
+    if (node) node.textContent = value;
+  };
+
+  setText('[data-pf-title]', t('profile.title'));
+  setText('[data-pf-email-label]', t('profile.email'));
+  setText('[data-pf-name-label]', t('profile.displayName'));
+  setText('[data-pf-name-sr]', t('profile.displayName'));
+  setText('[data-pf-save]', t('profile.save'));
+  setText('[data-pf-stats]', t('planner.statsTitle'));
+  setText('[data-pf-xp]', t('profile.xp'));
+  setText('[data-pf-streak]', t('profile.streak'));
+  setText('[data-pf-level]', t('profile.level'));
+  setText('[data-pf-logout]', t('profile.logout'));
+
+  const emailOut = document.querySelector<HTMLElement>('[data-pf-email]');
+  const form = document.querySelector<HTMLFormElement>('[data-pf-form]');
+  const nameInput = document.querySelector<HTMLInputElement>('[data-pf-name]');
+  const statusOut = document.querySelector<HTMLElement>('[data-pf-status]');
+  const xpOut = document.querySelector<HTMLElement>('[data-pf-xp-value]');
+  const streakOut = document.querySelector<HTMLElement>('[data-pf-streak-value]');
+  const levelOut = document.querySelector<HTMLElement>('[data-pf-level-value]');
+  const logoutBtn = document.querySelector<HTMLButtonElement>('[data-pf-logout]');
+  if (nameInput) nameInput.placeholder = t('profile.displayNamePlaceholder');
+
+  form?.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    if (!nameInput || !statusOut) return;
+    const displayName = nameInput.value.trim();
+    if (!displayName) {
+      statusOut.textContent = t('profile.nameRequired');
+      return;
+    }
+    const { data: auth } = await supabase.auth.getUser();
+    const userId = auth.user?.id;
+    if (!userId) return;
+
+    const { error } = await supabase
+      .from('profiles')
+      .update({ display_name: displayName })
+      .eq('id', userId);
+    statusOut.textContent = error ? t('creator.failed') : t('profile.saved');
+  });
+
+  logoutBtn?.addEventListener('click', async () => {
+    await supabase.auth.signOut();
+    window.location.href = authRedirect(locale, '');
+  });
+
+  void (async () => {
+    const { data: auth } = await supabase.auth.getUser();
+    const user = auth.user;
+    if (!user) return; // AppLayout shows the auth gate instead.
+
+    if (emailOut) emailOut.textContent = user.email ?? '';
+    if (nameInput) {
+      const { data } = await supabase
+        .from('profiles')
+        .select('display_name')
+        .eq('id', user.id)
+        .maybeSingle();
+      nameInput.value = data?.display_name ?? '';
+    }
+
+    const stats = await getUserStats(user.id);
+    if (xpOut) xpOut.textContent = num(stats.xp);
+    if (streakOut) streakOut.textContent = num(stats.streak_count);
+    if (levelOut) levelOut.textContent = num(levelForXp(stats.xp));
+  })().catch((error) => logDetail('profile', error));
+</script>

@@ -1,0 +1,298 @@
+---
+/* /quiz/:subject? — brief/04-pages.md: one question at a time, 4 options,
+   instant correction + explanation. Correct = +10 XP (signed-in only). */
+const { locale, subjectSlug = '' } = Astro.props as {
+  locale: 'en' | 'ar';
+  subjectSlug?: string;
+};
+---
+
+<section class="section">
+  <div class="container">
+    <div class="section__head">
+      <p class="eyebrow" data-quiz-eyebrow></p>
+      <h1 data-quiz-title></h1>
+      <p class="section__lead" data-quiz-progress hidden></p>
+    </div>
+
+    {/* The optional :subject slug reaches the client script through rendered
+       markup: Astro.props only exists during the server render. */}
+    <div class="quiz__picker" data-quiz-picker data-quiz-subject-slug={subjectSlug}>
+      <label class="quiz__label" for="quiz-subject" data-quiz-subject-label></label>
+      <select id="quiz-subject" class="quiz__select" data-quiz-subject></select>
+      <button type="button" class="btn btn--primary" data-quiz-start></button>
+    </div>
+
+    <div class="card quiz__card" data-quiz-card hidden>
+      <p class="quiz__question" data-quiz-question lang={locale} dir="auto"></p>
+      <ul class="stack quiz__options" data-quiz-options></ul>
+      <p class="quiz__feedback" data-quiz-feedback role="status"></p>
+      <div class="quiz__explain" data-quiz-explain hidden>
+        <p class="quiz__explain-label" data-quiz-explain-label></p>
+        <p class="quiz__explain-body" data-quiz-explain-body lang={locale} dir="auto"></p>
+      </div>
+      <button type="button" class="btn btn--primary" data-quiz-next hidden></button>
+    </div>
+
+    <div class="card empty-state" data-quiz-result hidden>
+      <p class="empty-state__title" data-quiz-score></p>
+      <button type="button" class="btn btn--ghost" data-quiz-again></button>
+    </div>
+
+    <p class="offline-note" data-quiz-login hidden></p>
+  </div>
+</section>
+
+<script>
+  import { supabase } from '../../lib/supabase';
+  import { getDictionary, toArabicDigits } from '../../lib/copy';
+  import { localeFromDocument } from '../../lib/auth-ui';
+  import { logDetail } from '../../lib/site';
+  import { normalizeOptions } from '../../lib/options';
+  import { awardXp, XP_AMOUNTS } from '../../lib/xp';
+
+  const locale = localeFromDocument();
+  const copy = getDictionary(locale) as Record<string, string>;
+  const t = (k: string) => copy[k] ?? '';
+  const num = (n: number | string) =>
+    locale === 'ar' ? toArabicDigits(n) : String(n);
+
+  const setText = (sel: string, value: string) => {
+    const node = document.querySelector<HTMLElement>(sel);
+    if (node) node.textContent = value;
+  };
+
+  setText('[data-quiz-eyebrow]', t('quiz.title'));
+  setText('[data-quiz-title]', t('quiz.title'));
+  setText('[data-quiz-subject-label]', t('quiz.subject'));
+  setText('[data-quiz-start]', t('quiz.start'));
+  setText('[data-quiz-next]', t('quiz.next'));
+  setText('[data-quiz-explain-label]', t('quiz.explain'));
+  setText('[data-quiz-again]', t('quiz.tryAgain'));
+
+  const picker = document.querySelector<HTMLElement>('[data-quiz-picker]');
+  const subjectSelect = document.querySelector<HTMLSelectElement>('[data-quiz-subject]');
+  const startBtn = document.querySelector<HTMLButtonElement>('[data-quiz-start]');
+  const progressOut = document.querySelector<HTMLElement>('[data-quiz-progress]');
+  const card = document.querySelector<HTMLElement>('[data-quiz-card]');
+  const questionOut = document.querySelector<HTMLElement>('[data-quiz-question]');
+  const optionsOut = document.querySelector<HTMLElement>('[data-quiz-options]');
+  const feedbackOut = document.querySelector<HTMLElement>('[data-quiz-feedback]');
+  const explainBox = document.querySelector<HTMLElement>('[data-quiz-explain]');
+  const explainBody = document.querySelector<HTMLElement>('[data-quiz-explain-body]');
+  const nextBtn = document.querySelector<HTMLButtonElement>('[data-quiz-next]');
+  const resultBox = document.querySelector<HTMLElement>('[data-quiz-result]');
+  const scoreOut = document.querySelector<HTMLElement>('[data-quiz-score]');
+  const againBtn = document.querySelector<HTMLButtonElement>('[data-quiz-again]');
+  const loginNote = document.querySelector<HTMLElement>('[data-quiz-login]');
+
+  const initialSubject =
+    document.querySelector<HTMLElement>('[data-quiz-picker]')?.dataset.quizSubjectSlug ?? '';
+  type SubjectRow = { id: string; slug: string; name_en: string; name_ar: string };
+  type QuestionRow = {
+    id: string;
+    subject_id: string | null;
+    question_en: string;
+    question_ar: string;
+    options: unknown;
+    correct_index: number;
+    explanation_en: string | null;
+    explanation_ar: string | null;
+  };
+
+  let questions: QuestionRow[] = [];
+  let index = 0;
+  let score = 0;
+  let answered = false;
+  let signedIn = false;
+
+  const show = (node: HTMLElement | null | undefined, on: boolean) => {
+    if (node) node.hidden = !on;
+  };
+
+  function message(text: string) {
+    if (card) card.hidden = true;
+    show(resultBox, false);
+    const p = document.createElement('p');
+    p.className = 'empty';
+    p.textContent = text;
+    feedbackOut?.replaceChildren(p);
+    show(feedbackOut, true);
+  }
+
+  async function populateSubjects() {
+    if (!subjectSelect) return;
+    const { data } = await supabase
+      .from('subjects')
+      .select('id,slug,name_en,name_ar')
+      .order('name_en');
+    const rows = (data ?? []) as SubjectRow[];
+
+    const all = document.createElement('option');
+    all.value = '';
+    all.textContent = t('quiz.allSubjects');
+    subjectSelect.append(all);
+
+    for (const row of rows) {
+      const option = document.createElement('option');
+      option.value = row.id;
+      option.textContent = locale === 'ar' ? row.name_ar : row.name_en;
+      subjectSelect.append(option);
+    }
+
+    if (initialSubject) {
+      const match = rows.find((row) => row.slug === initialSubject);
+      if (match) subjectSelect.value = match.id;
+    }
+    return rows;
+  }
+
+  async function load(subjectId: string) {
+    let query = supabase
+      .from('questions')
+      .select('id,subject_id,question_en,question_ar,options,correct_index,explanation_en,explanation_ar');
+    if (subjectId) query = query.eq('subject_id', subjectId);
+    const { data, error } = await query.limit(50);
+    if (error) throw error;
+    questions = ((data ?? []) as QuestionRow[]).sort(() => Math.random() - 0.5);
+  }
+
+  function renderQuestion() {
+    if (!optionsOut || !card) return;
+    /* Only `answered` resets per question: index and score belong to the run,
+       so resetting them here would repeat question one forever. */
+    answered = false;
+
+    if (questions.length === 0) {
+      show(progressOut, false);
+      show(picker, true);
+      message(t('quiz.noQuestions'));
+      return;
+    }
+
+    show(picker, false);
+    show(resultBox, false);
+    show(card, true);
+    show(feedbackOut, false);
+    show(explainBox, false);
+    show(nextBtn, false);
+
+    const question = questions[index];
+    if (progressOut) {
+      progressOut.hidden = false;
+      progressOut.textContent = t('quiz.questionOf')
+        .replace('{n}', num(index + 1))
+        .replace('{total}', num(questions.length));
+    }
+    if (questionOut) {
+      questionOut.textContent =
+        locale === 'ar' ? question.question_ar || question.question_en : question.question_en || question.question_ar;
+    }
+
+    optionsOut.replaceChildren();
+    normalizeOptions(question.options, locale).forEach((text, optionIndex) => {
+      const li = document.createElement('li');
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'btn btn--ghost quiz__option';
+      button.lang = locale;
+      button.dir = 'auto';
+      button.textContent = text;
+      button.addEventListener('click', () => answer(optionIndex));
+      li.append(button);
+      optionsOut.append(li);
+    });
+  }
+
+  async function answer(chosen: number) {
+    if (answered || !optionsOut) return;
+    answered = true;
+    const question = questions[index];
+    const correct = chosen === question.correct_index;
+    if (correct) score += 1;
+
+    const buttons = [...optionsOut.querySelectorAll<HTMLButtonElement>('button')];
+    buttons.forEach((button, i) => {
+      button.disabled = true;
+      if (i === question.correct_index) button.classList.add('quiz__option--correct');
+      else if (i === chosen) button.classList.add('quiz__option--wrong');
+    });
+
+    if (feedbackOut) {
+      feedbackOut.hidden = false;
+      feedbackOut.className = correct ? 'quiz__feedback quiz__feedback--correct' : 'quiz__feedback quiz__feedback--wrong';
+      feedbackOut.textContent = correct ? t('quiz.correct') : t('quiz.wrong');
+    }
+
+    const explanation =
+      locale === 'ar'
+        ? question.explanation_ar || question.explanation_en
+        : question.explanation_en || question.explanation_ar;
+    if (explainBody) explainBody.textContent = explanation ?? '';
+    show(explainBox, Boolean(explanation));
+
+    if (correct && signedIn) await awardXp(XP_AMOUNTS.quizCorrect);
+    show(nextBtn, true);
+    nextBtn?.focus();
+  }
+
+  function finish() {
+    if (!card) return;
+    show(card, false);
+    show(resultBox, true);
+    show(progressOut, false);
+    show(picker, true);
+    if (scoreOut) {
+      scoreOut.textContent = t('quiz.score')
+        .replace('{score}', num(score))
+        .replace('{total}', num(questions.length));
+    }
+  }
+
+  nextBtn?.addEventListener('click', () => {
+    if (index + 1 >= questions.length) finish();
+    else {
+      index += 1;
+      renderQuestion();
+    }
+  });
+
+  againBtn?.addEventListener('click', () => void begin());
+
+  async function begin() {
+    const subjectId = subjectSelect?.value ?? '';
+    index = 0;
+    score = 0;
+    show(picker, false);
+    if (feedbackOut) {
+      feedbackOut.hidden = true;
+      feedbackOut.className = 'quiz__feedback';
+    }
+    try {
+      setText('[data-quiz-eyebrow]', t('quiz.loading'));
+      await load(subjectId);
+      if (questions.length === 0) {
+        show(picker, true);
+        message(t('quiz.noQuestions'));
+        return;
+      }
+      renderQuestion();
+    } catch (error) {
+      logDetail('quiz', error);
+      show(picker, true);
+      message(t('quiz.noQuestions'));
+    }
+  }
+
+  startBtn?.addEventListener('click', () => void begin());
+
+  void (async () => {
+    const { data } = await supabase.auth.getUser();
+    signedIn = Boolean(data.user);
+    show(loginNote, !signedIn);
+    if (loginNote) loginNote.textContent = t('quiz.needLogin');
+    await populateSubjects();
+    if (initialSubject) void begin();
+    else if (picker) setText('[data-quiz-eyebrow]', t('quiz.pickSubject'));
+  })().catch((error) => logDetail('quiz-init', error));
+</script>

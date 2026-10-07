@@ -1,0 +1,233 @@
+---
+/* /search?q= — brief/04-pages.md: results across lessons + glossary terms.
+   Empty query -> popular topics; no results -> friendly note + Ask EduChat. */
+---
+
+<section class="section">
+  <div class="container">
+    <div class="section__head">
+      <p class="eyebrow" data-search-eyebrow></p>
+      <h1 data-search-title></h1>
+    </div>
+
+    <form class="widget__form" role="search" data-search-form>
+      <label class="sr-only" for="search-input" data-search-label></label>
+      <input
+        id="search-input"
+        name="q"
+        type="search"
+        autocomplete="off"
+        data-search-input
+      />
+      <button type="submit" class="btn btn--primary" data-search-submit></button>
+    </form>
+
+    <div class="search__status" aria-live="polite" data-search-status></div>
+
+    <section class="search__group" data-search-lessons hidden>
+      <h2 class="widget__title" data-search-lessons-title></h2>
+      <ul class="stack" data-search-lessons-list></ul>
+    </section>
+
+    <section class="search__group" data-search-terms hidden>
+      <h2 class="widget__title" data-search-terms-title></h2>
+      <ul class="stack" data-search-terms-list></ul>
+    </section>
+
+    <section class="search__group" data-search-topics hidden>
+      <h2 class="widget__title" data-search-popular-title></h2>
+      <div class="chip-row" data-search-topics-list></div>
+    </section>
+  </div>
+</section>
+
+<script>
+  import { supabase } from '../../lib/supabase';
+  import { getDictionary } from '../../lib/copy';
+  import { localeFromDocument } from '../../lib/auth-ui';
+  import { localePath, logDetail } from '../../lib/site';
+
+  const locale = localeFromDocument();
+  const copy = getDictionary(locale) as Record<string, string>;
+  const t = (k: string) => copy[k] ?? '';
+
+  const setText = (sel: string, value: string) => {
+    const node = document.querySelector<HTMLElement>(sel);
+    if (node) node.textContent = value;
+  };
+
+  setText('[data-search-eyebrow]', t('meta.searchTitle'));
+  setText('[data-search-title]', t('search.title'));
+  setText('[data-search-submit]', t('search.submit'));
+  setText('[data-search-label]', t('search.label'));
+  setText('[data-search-popular-title]', t('search.popularTags'));
+  setText('[data-search-lessons-title]', t('meta.searchTitle'));
+  setText('[data-search-terms-title]', t('meta.glossaryTitle'));
+
+  const form = document.querySelector<HTMLFormElement>('[data-search-form]');
+  const input = document.querySelector<HTMLInputElement>('[data-search-input]');
+  const status = document.querySelector<HTMLElement>('[data-search-status]');
+  const lessonsBox = document.querySelector<HTMLElement>('[data-search-lessons]');
+  const lessonsList = document.querySelector<HTMLElement>('[data-search-lessons-list]');
+  const termsBox = document.querySelector<HTMLElement>('[data-search-terms]');
+  const termsList = document.querySelector<HTMLElement>('[data-search-terms-list]');
+  const topicsBox = document.querySelector<HTMLElement>('[data-search-topics]');
+  const topicsList = document.querySelector<HTMLElement>('[data-search-topics-list]');
+
+  if (input) {
+    input.placeholder = t('search.placeholder');
+    const initial = new URLSearchParams(window.location.search).get('q') ?? '';
+    input.value = initial;
+  }
+
+  function hideAll() {
+    for (const node of [lessonsBox, termsBox, topicsBox]) if (node) node.hidden = true;
+  }
+
+  function line(text: string): HTMLParagraphElement {
+    const p = document.createElement('p');
+    p.className = 'empty';
+    p.textContent = text;
+    return p;
+  }
+
+  function askEduChatLink(query: string): HTMLAnchorElement {
+    const a = document.createElement('a');
+    a.className = 'btn btn--ghost';
+    a.href = `https://educhat.pages.dev?q=${encodeURIComponent(query)}`;
+    a.rel = 'noopener';
+    a.textContent = t('search.askEduChat');
+    return a;
+  }
+
+  /* PostgREST's or() filter is comma/paren separated, so a keyword containing
+     those characters ("math, or (physics)") would build a malformed filter and
+     fail the whole request. They are stripped instead of escaped, which keeps
+     the term a plain substring match. */
+  function orSafe(value: string): string {
+    return value.replace(/[,()%'"]/g, ' ').replace(/\s+/g, ' ').trim();
+  }
+
+  function renderTopics() {
+    if (!topicsList || !status || !topicsBox) return;
+    status.replaceChildren(line(t('search.emptyQuery')));
+    topicsList.replaceChildren();
+    topicsBox.hidden = false;
+
+    void (async () => {
+      const { data } = await supabase
+        .from('subjects')
+        .select('id,slug,name_en,name_ar,grades(slug)')
+        .limit(14);
+      const rows = (data ?? []) as {
+        slug: string;
+        name_en: string;
+        name_ar: string;
+        grades: { slug: string }[] | { slug: string } | null;
+      }[];
+
+      for (const row of rows) {
+        const grade = Array.isArray(row.grades) ? row.grades[0] : row.grades;
+        if (!grade?.slug) continue;
+        const href = localePath(locale, `grades/${grade.slug}/subjects/${row.slug}/`);
+        const a = document.createElement('a');
+        a.className = 'chip';
+        a.href = href;
+        a.textContent = locale === 'ar' ? row.name_ar : row.name_en;
+        topicsList.append(a);
+      }
+    })().catch((error) => logDetail('search-topics', error));
+  }
+
+  async function runSearch(query: string) {
+    if (!status || !lessonsList || !termsList) return;
+    hideAll();
+    status.replaceChildren(line(`${t('search.resultsFor')} “${query}”`));
+    lessonsList.replaceChildren();
+    termsList.replaceChildren();
+
+    // brief/05-backend-map.md: search_vector with the simple/plain config.
+    const lessonQuery = supabase
+      .from('lessons')
+      .select('id,slug,title_en,title_ar')
+      .textSearch('search_vector', query, { type: 'plain', config: 'simple' })
+      .limit(20);
+
+    /* A keyword made only of filter punctuation searches nothing at all, so the
+       glossary query is skipped instead of matching every term. */
+    const safeTerm = orSafe(query);
+    const termQuery = safeTerm
+      ? supabase
+          .from('glossary')
+          .select('id,term_en,term_ar')
+          .or(`term_en.ilike.%${safeTerm}%,term_ar.ilike.%${safeTerm}%`)
+          .limit(20)
+      : Promise.resolve({ data: [], error: null });
+
+    const [lessonsRes, termsRes] = await Promise.allSettled([lessonQuery, termQuery]);
+
+    const lessons =
+      lessonsRes.status === 'fulfilled'
+        ? ((lessonsRes.value.data ?? []) as {
+            slug: string;
+            title_en: string;
+            title_ar: string;
+          }[])
+        : [];
+    const terms =
+      termsRes.status === 'fulfilled'
+        ? ((termsRes.value.data ?? []) as { term_en: string; term_ar: string }[])
+        : [];
+
+    if (lessons.length === 0 && terms.length === 0) {
+      status.replaceChildren(line(t('search.noResults')), askEduChatLink(query));
+      return;
+    }
+
+    if (lessons.length > 0 && lessonsBox && lessonsList) {
+      /* Lesson titles are listed as plain text: /lessons/:slug pages are not
+         built yet, so linking to them would dead-end every result. */
+      for (const row of lessons) {
+        const li = document.createElement('li');
+        li.textContent = locale === 'ar' ? row.title_ar : row.title_en;
+        lessonsList.append(li);
+      }
+      lessonsBox.hidden = false;
+    }
+
+    if (terms.length > 0 && termsBox && termsList) {
+      for (const row of terms) {
+        const li = document.createElement('li');
+        li.textContent = locale === 'ar' ? row.term_ar : row.term_en;
+        termsList.append(li);
+      }
+      termsBox.hidden = false;
+    }
+  }
+
+  async function search() {
+    const query = (input?.value ?? '').trim();
+    if (!query) {
+      renderTopics();
+      return;
+    }
+    try {
+      await runSearch(query);
+    } catch (error) {
+      logDetail('search', error);
+      status?.replaceChildren(line(t('search.noResults')), askEduChatLink(query));
+    }
+  }
+
+  form?.addEventListener('submit', (event) => {
+    event.preventDefault();
+    const query = (input?.value ?? '').trim();
+    const url = new URL(window.location.href);
+    if (query) url.searchParams.set('q', query);
+    else url.searchParams.delete('q');
+    window.history.replaceState({}, '', url);
+    void search();
+  });
+
+  void search();
+</script>

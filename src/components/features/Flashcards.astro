@@ -1,0 +1,251 @@
+---
+/* /flashcards/:subject? — brief/04-pages.md: tap-to-flip cards, shuffle,
+   known/unknown piles. */
+const { locale, subjectSlug = '' } = Astro.props as {
+  locale: 'en' | 'ar';
+  subjectSlug?: string;
+};
+---
+
+<section class="section">
+  <div class="container">
+    <div class="section__head">
+      <p class="eyebrow" data-fl-eyebrow></p>
+      <h1 data-fl-title></h1>
+      <p class="section__lead" data-fl-progress hidden></p>
+    </div>
+
+    {/* The optional :subject slug reaches the client script through rendered
+       markup: Astro.props only exists during the server render. */}
+    <div class="flash__picker" data-fl-picker data-fl-subject-slug={subjectSlug}>
+      <label class="quiz__label" for="flash-subject" data-fl-subject-label></label>
+      <select id="flash-subject" class="quiz__select" data-fl-subject></select>
+      <button type="button" class="btn btn--primary" data-fl-start></button>
+    </div>
+
+    <div class="flash" data-fl-stage hidden>
+      <button type="button" class="flash__card" data-fl-card aria-pressed="false">
+        <span class="flash__face flash__face--front" data-fl-front lang={locale} dir="auto"></span>
+        <span class="flash__face flash__face--back" data-fl-back lang={locale} dir="auto"></span>
+      </button>
+
+      <p class="flash__hint" data-fl-hint></p>
+
+      <div class="flash__actions">
+        <button type="button" class="btn btn--ghost" data-fl-shuffle></button>
+        <button type="button" class="btn btn--ghost" data-fl-unknown></button>
+        <button type="button" class="btn btn--primary" data-fl-known></button>
+      </div>
+
+      <dl class="flash__tally">
+        <div class="flash__tally-item">
+          <dt data-fl-known-label></dt>
+          <dd data-fl-known-count>0</dd>
+        </div>
+        <div class="flash__tally-item">
+          <dt data-fl-unknown-label></dt>
+          <dd data-fl-unknown-count>0</dd>
+        </div>
+      </dl>
+
+      <button type="button" class="btn btn--ghost" data-fl-reset></button>
+    </div>
+
+    <div class="card empty-state" data-fl-empty hidden>
+      <p class="empty-state__title" data-fl-empty-text></p>
+    </div>
+  </div>
+</section>
+
+<script>
+  import { supabase } from '../../lib/supabase';
+  import { getDictionary, toArabicDigits } from '../../lib/copy';
+  import { localeFromDocument } from '../../lib/auth-ui';
+  import { logDetail } from '../../lib/site';
+
+  const locale = localeFromDocument();
+  const copy = getDictionary(locale) as Record<string, string>;
+  const t = (k: string) => copy[k] ?? '';
+  const num = (n: number | string) => (locale === 'ar' ? toArabicDigits(n) : String(n));
+
+  const setText = (sel: string, value: string) => {
+    const node = document.querySelector<HTMLElement>(sel);
+    if (node) node.textContent = value;
+  };
+
+  setText('[data-fl-eyebrow]', t('flash.title'));
+  setText('[data-fl-title]', t('flash.title'));
+  setText('[data-fl-subject-label]', t('flash.subject'));
+  setText('[data-fl-start]', t('quiz.start'));
+  setText('[data-fl-shuffle]', t('flash.shuffle'));
+  setText('[data-fl-known]', t('flash.known'));
+  setText('[data-fl-unknown]', t('flash.unknown'));
+  setText('[data-fl-known-label]', t('flash.knownCount'));
+  setText('[data-fl-unknown-label]', t('flash.unknownCount'));
+  setText('[data-fl-reset]', t('flash.reset'));
+  setText('[data-fl-hint]', t('flash.flipHint'));
+
+  const initialSubject =
+    document.querySelector<HTMLElement>('[data-fl-picker]')?.dataset.flSubjectSlug ?? '';
+  const picker = document.querySelector<HTMLElement>('[data-fl-picker]');
+  const subjectSelect = document.querySelector<HTMLSelectElement>('[data-fl-subject]');
+  const startBtn = document.querySelector<HTMLButtonElement>('[data-fl-start]');
+  const stage = document.querySelector<HTMLElement>('[data-fl-stage]');
+  const emptyBox = document.querySelector<HTMLElement>('[data-fl-empty]');
+  const progressOut = document.querySelector<HTMLElement>('[data-fl-progress]');
+  const cardBtn = document.querySelector<HTMLButtonElement>('[data-fl-card]');
+  const frontOut = document.querySelector<HTMLElement>('[data-fl-front]');
+  const backOut = document.querySelector<HTMLElement>('[data-fl-back]');
+  const knownCount = document.querySelector<HTMLElement>('[data-fl-known-count]');
+  const unknownCount = document.querySelector<HTMLElement>('[data-fl-unknown-count]');
+  const resetBtn = document.querySelector<HTMLButtonElement>('[data-fl-reset]');
+
+  type CardRow = {
+    id: string;
+    subject_id: string | null;
+    front_en: string;
+    front_ar: string;
+    back_en: string;
+    back_ar: string;
+  };
+
+  let cards: CardRow[] = [];
+  let position = 0;
+  let flipped = false;
+  let known = 0;
+  let unknown = 0;
+
+  const show = (node: HTMLElement | null | undefined, on: boolean) => {
+    if (node) node.hidden = !on;
+  };
+
+  function tally() {
+    if (knownCount) knownCount.textContent = num(known);
+    if (unknownCount) unknownCount.textContent = num(unknown);
+    if (progressOut) {
+      progressOut.hidden = cards.length === 0;
+      progressOut.textContent = t('flash.progress')
+        .replace('{n}', num(Math.min(position + 1, cards.length)))
+        .replace('{total}', num(cards.length));
+    }
+  }
+
+  function paint() {
+    const row = cards[position];
+    if (!row || !frontOut || !backOut) return;
+    frontOut.textContent = locale === 'ar' ? row.front_ar || row.front_en : row.front_en || row.front_ar;
+    backOut.textContent = locale === 'ar' ? row.back_ar || row.back_en : row.back_en || row.back_ar;
+    flipped = false;
+    cardBtn?.setAttribute('aria-pressed', 'false');
+    cardBtn?.classList.remove('flash__card--flipped');
+  }
+
+  function advance() {
+    position += 1;
+    if (position >= cards.length) {
+      position = 0;
+      paint();
+      tally();
+      return;
+    }
+    paint();
+    tally();
+  }
+
+  function shuffle() {
+    for (let i = cards.length - 1; i > 0; i -= 1) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [cards[i], cards[j]] = [cards[j], cards[i]];
+    }
+    position = 0;
+    known = 0;
+    unknown = 0;
+    paint();
+    tally();
+  }
+
+  async function populateSubjects() {
+    if (!subjectSelect) return;
+    const { data } = await supabase
+      .from('subjects')
+      .select('id,slug,name_en,name_ar')
+      .order('name_en');
+    const rows = (data ?? []) as { id: string; slug: string; name_en: string; name_ar: string }[];
+
+    const all = document.createElement('option');
+    all.value = '';
+    all.textContent = t('quiz.allSubjects');
+    subjectSelect.append(all);
+
+    for (const row of rows) {
+      const option = document.createElement('option');
+      option.value = row.id;
+      option.textContent = locale === 'ar' ? row.name_ar : row.name_en;
+      subjectSelect.append(option);
+    }
+
+    if (initialSubject) {
+      const match = rows.find((row) => row.slug === initialSubject);
+      if (match) subjectSelect.value = match.id;
+    }
+  }
+
+  async function begin() {
+    const subjectId = subjectSelect?.value ?? '';
+    show(picker, false);
+    try {
+      let query = supabase.from('flashcards').select('id,subject_id,front_en,front_ar,back_en,back_ar');
+      if (subjectId) query = query.eq('subject_id', subjectId);
+      const { data, error } = await query.limit(100);
+      if (error) throw error;
+
+      cards = (data ?? []) as CardRow[];
+      position = 0;
+      known = 0;
+      unknown = 0;
+
+      if (cards.length === 0) {
+        show(stage, false);
+        show(emptyBox, true);
+        show(picker, true);
+        show(progressOut, false);
+        setText('[data-fl-empty-text]', t('flash.noCards'));
+        return;
+      }
+
+      show(emptyBox, false);
+      show(stage, true);
+      paint();
+      tally();
+    } catch (error) {
+      logDetail('flashcards', error);
+      show(picker, true);
+      show(stage, false);
+      show(emptyBox, true);
+      setText('[data-fl-empty-text]', t('flash.noCards'));
+    }
+  }
+
+  cardBtn?.addEventListener('click', () => {
+    flipped = !flipped;
+    cardBtn.setAttribute('aria-pressed', flipped ? 'true' : 'false');
+    cardBtn.classList.toggle('flash__card--flipped', flipped);
+  });
+
+  document.querySelector('[data-fl-known]')?.addEventListener('click', () => {
+    known += 1;
+    advance();
+  });
+  document.querySelector('[data-fl-unknown]')?.addEventListener('click', () => {
+    unknown += 1;
+    advance();
+  });
+  document.querySelector('[data-fl-shuffle]')?.addEventListener('click', shuffle);
+  resetBtn?.addEventListener('click', () => void begin());
+  startBtn?.addEventListener('click', () => void begin());
+
+  void (async () => {
+    await populateSubjects();
+    if (initialSubject) void begin();
+  })().catch((error) => logDetail('flashcards-init', error));
+</script>

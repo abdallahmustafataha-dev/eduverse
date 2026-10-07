@@ -1,0 +1,168 @@
+---
+/* /polls — brief/04-pages.md: one active poll, vote once (no update policy by
+   design), live results via the poll_results RPC. */
+const { locale } = Astro.props as { locale: 'en' | 'ar' };
+---
+
+<div>
+  <header class="app__head">
+    <h1 data-po-title></h1>
+    <p class="app__lead" data-po-lead></p>
+  </header>
+
+  <section class="widget" aria-live="polite" data-po-card hidden>
+    <p class="poll__question" data-po-question lang={locale} dir="auto"></p>
+    <ul class="stack" data-po-options></ul>
+    <p class="poll__status" data-po-status role="status"></p>
+  </section>
+
+  <section class="widget">
+    <p class="offline-note" data-po-empty></p>
+  </section>
+</div>
+
+<script>
+  import { supabase } from '../../lib/supabase';
+  import { getDictionary, toArabicDigits } from '../../lib/copy';
+  import { localeFromDocument } from '../../lib/auth-ui';
+  import { logDetail } from '../../lib/site';
+  import { normalizeOptions } from '../../lib/options';
+
+  const locale = localeFromDocument();
+  const copy = getDictionary(locale) as Record<string, string>;
+  const t = (k: string) => copy[k] ?? '';
+
+  const setText = (sel: string, value: string) => {
+    const node = document.querySelector<HTMLElement>(sel);
+    if (node) node.textContent = value;
+  };
+
+  setText('[data-po-title]', t('polls.title'));
+  setText('[data-po-lead]', t('polls.votesCount').replace('{n}', '0'));
+  setText('[data-po-empty]', t('polls.noPoll'));
+
+  const card = document.querySelector<HTMLElement>('[data-po-card]');
+  const questionOut = document.querySelector<HTMLElement>('[data-po-question]');
+  const optionsOut = document.querySelector<HTMLElement>('[data-po-options]');
+  const statusOut = document.querySelector<HTMLElement>('[data-po-status]');
+
+  type Poll = { id: string; question_en: string; question_ar: string; options: unknown };
+  type Result = { option_index: number; votes: number };
+
+  let poll: Poll | null = null;
+  let results: Result[] = [];
+  let voted = false;
+
+  const total = () => results.reduce((sum, row) => sum + Number(row.votes ?? 0), 0);
+
+  function render() {
+    if (!poll || !optionsOut || !questionOut) return;
+    questionOut.textContent =
+      locale === 'ar' ? poll.question_ar || poll.question_en : poll.question_en || poll.question_ar;
+
+    const labels = normalizeOptions(poll.options, locale);
+    const sum = total();
+    optionsOut.replaceChildren();
+
+    labels.forEach((label, index) => {
+      const li = document.createElement('li');
+      li.className = 'poll__option';
+
+      const votes = Number(results.find((row) => row.option_index === index)?.votes ?? 0);
+      const percent = sum > 0 ? Math.round((votes / sum) * 100) : 0;
+
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'btn btn--ghost poll__choice';
+      button.lang = locale;
+      button.dir = 'auto';
+      button.textContent = label;
+      button.disabled = voted;
+
+      if (voted) {
+        const bar = document.createElement('span');
+        bar.className = 'poll__bar';
+        bar.style.inlineSize = `${percent}%`;
+        li.append(bar, button);
+      } else {
+        button.addEventListener('click', () => void vote(index));
+        li.append(button);
+      }
+
+      if (voted) {
+        const meta = document.createElement('span');
+        meta.className = 'poll__meta';
+        meta.textContent = `${percent}% · ${t('polls.votesCount').replace('{n}', locale === 'ar' ? toArabicDigits(votes) : String(votes))}`;
+        li.append(meta);
+      }
+
+      optionsOut.append(li);
+    });
+
+    if (voted && statusOut) statusOut.textContent = t('polls.voted');
+  }
+
+  async function loadResults() {
+    if (!poll) return;
+    const { data } = await supabase.rpc('poll_results', { poll_id: poll.id });
+    results = (data ?? []) as Result[];
+  }
+
+  async function vote(optionIndex: number) {
+    if (!poll || voted) return;
+    const { data: auth } = await supabase.auth.getUser();
+    const userId = auth.user?.id;
+    if (!userId) {
+      if (statusOut) statusOut.textContent = t('polls.needLogin');
+      return;
+    }
+
+    const { error } = await supabase
+      .from('poll_votes')
+      .insert({ poll_id: poll.id, user_id: userId, option_index: optionIndex });
+
+    // A duplicate vote is rejected by design (no update policy), which is how
+    // "one vote per person" is enforced. Both a clean insert and a duplicate
+    // end with results shown, so the student sees the outcome either way.
+    if (error) logDetail('poll-vote', error);
+    voted = true;
+    await loadResults();
+    render();
+  }
+
+  void (async () => {
+    const { data, error } = await supabase
+      .from('polls')
+      .select('id,question_en,question_ar,options')
+      .eq('active', true)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (error) throw error;
+    if (!data) {
+      if (card) card.hidden = true;
+      return;
+    }
+
+    poll = data as Poll;
+    if (card) card.hidden = false;
+
+    const { data: auth } = await supabase.auth.getUser();
+    if (auth.user) {
+      const { data: mine } = await supabase
+        .from('poll_votes')
+        .select('option_index')
+        .eq('poll_id', poll.id)
+        .eq('user_id', auth.user.id)
+        .maybeSingle();
+      voted = Boolean(mine);
+    }
+
+    await loadResults();
+    render();
+  })().catch((error) => {
+    logDetail('polls', error);
+    if (card) card.hidden = true;
+  });
+</script>

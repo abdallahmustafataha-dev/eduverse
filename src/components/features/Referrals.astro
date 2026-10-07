@@ -1,0 +1,138 @@
+---
+/* /referrals — brief/04-pages.md: "personal invite link (/signup?ref=<uid>)
+   + invited count", where each classmate who joins is worth +100 XP
+   (XP_AMOUNTS.referral in src/lib/xp.ts).
+
+   The invite code IS the EduID user id, per the brief — there is no
+   referral_code column on profiles, so none is read.
+
+   The +100 XP award is deliberately not attempted from this browser. Live RLS
+   forbids it: referrals has `with check (auth.uid() = referrer_id)` (only the
+   referrer may insert, not the invitee) and user_stats is own-row only
+   (insert/select/update all require auth.uid() = user_id), so neither the
+   invitee nor the referrer can write the reward from the client. Awarding it
+   needs an owner-side database trigger or policy, and this project does not
+   modify schema, RLS, or RPCs. */
+---
+
+<div>
+  <header class="app__head">
+    <h1 data-rf-title></h1>
+    <p class="app__lead" data-rf-lead></p>
+  </header>
+
+  <section class="widget" aria-labelledby="rf-link">
+    <h2 class="widget__title" id="rf-link" data-rf-link-title></h2>
+    <div class="ref__link">
+      <input type="text" readonly data-rf-input dir="ltr" aria-labelledby="rf-link" />
+      <button type="button" class="btn btn--primary" data-rf-copy></button>
+      <button type="button" class="btn btn--ghost" data-rf-share hidden></button>
+    </div>
+    <p class="profile__status" data-rf-status role="status"></p>
+  </section>
+
+  <section class="widget" aria-labelledby="rf-count">
+    <h2 class="widget__title" id="rf-count" data-rf-count-title></h2>
+    <p class="empty" data-rf-loading></p>
+    <p data-rf-count hidden></p>
+    <p class="empty" data-rf-empty hidden></p>
+  </section>
+</div>
+
+<script>
+  import { supabase } from '../../lib/supabase';
+  import { getDictionary, toArabicDigits } from '../../lib/copy';
+  import { localeFromDocument } from '../../lib/auth-ui';
+  import { localePath, logDetail } from '../../lib/site';
+
+  const locale = localeFromDocument();
+  const copy = getDictionary(locale) as Record<string, string>;
+  const t = (k: string) => copy[k] ?? '';
+  const num = (n: number | string) => (locale === 'ar' ? toArabicDigits(n) : String(n));
+
+  const setText = (sel: string, value: string) => {
+    const node = document.querySelector<HTMLElement>(sel);
+    if (node) node.textContent = value;
+  };
+
+  setText('[data-rf-title]', t('ref.title'));
+  setText('[data-rf-lead]', t('ref.bonus'));
+  setText('[data-rf-link-title]', t('ref.yourLink'));
+  setText('[data-rf-copy]', t('ref.copy'));
+  setText('[data-rf-share]', t('ref.share'));
+  setText('[data-rf-count-title]', t('ref.invited'));
+  setText('[data-rf-loading]', t('ref.loading'));
+
+  const linkInput = document.querySelector<HTMLInputElement>('[data-rf-input]');
+  const copyBtn = document.querySelector<HTMLButtonElement>('[data-rf-copy]');
+  const shareBtn = document.querySelector<HTMLButtonElement>('[data-rf-share]');
+  const statusOut = document.querySelector<HTMLElement>('[data-rf-status]');
+  const loadingOut = document.querySelector<HTMLElement>('[data-rf-loading]');
+  const countOut = document.querySelector<HTMLElement>('[data-rf-count]');
+  const emptyOut = document.querySelector<HTMLElement>('[data-rf-empty]');
+  setText('[data-rf-empty]', t('ref.empty'));
+
+  function setStatus(key: string) {
+    if (statusOut) statusOut.textContent = t(key);
+  }
+
+  async function loadCount(userId: string) {
+    /* referrals_own_select is `auth.uid() = referrer_id`, so a student can
+       count their own invites and nothing else. */
+    const { count, error } = await supabase
+      .from('referrals')
+      .select('id', { count: 'exact', head: true })
+      .eq('referrer_id', userId);
+    if (error) {
+      logDetail('referrals-count', error);
+      if (loadingOut) loadingOut.hidden = true;
+      return;
+    }
+    const total = count ?? 0;
+    if (loadingOut) loadingOut.hidden = true;
+    if (countOut) {
+      countOut.textContent = num(total);
+      countOut.hidden = false;
+    }
+    if (emptyOut) emptyOut.hidden = total > 0;
+  }
+
+  copyBtn?.addEventListener('click', async () => {
+    if (!linkInput) return;
+    try {
+      await navigator.clipboard.writeText(linkInput.value);
+      setStatus('ref.copied');
+    } catch {
+      // Clipboard can be blocked; the input is selectable either way.
+      linkInput.select();
+      setStatus('ref.copy');
+    }
+  });
+
+  shareBtn?.addEventListener('click', async () => {
+    if (!linkInput) return;
+    const url = linkInput.value;
+    const payload = { title: t('ref.title'), text: t('ref.bonus'), url };
+    try {
+      if (navigator.share) await navigator.share(payload);
+      else {
+        await navigator.clipboard.writeText(url);
+        setStatus('ref.copied');
+      }
+    } catch {
+      /* The student dismissed the share sheet: nothing to report. */
+    }
+  });
+
+  void (async () => {
+    const { data: auth } = await supabase.auth.getUser();
+    const userId = auth.user?.id ?? null;
+    if (!userId) return; // AppLayout shows the auth gate instead.
+
+    /* brief/04-pages.md: the invite code is the user's own uid. */
+    if (linkInput) linkInput.value = `${window.location.origin}${localePath(locale, 'signup/')}?ref=${userId}`;
+    if (shareBtn) shareBtn.hidden = typeof navigator.share !== 'function';
+
+    await loadCount(userId);
+  })().catch((error) => logDetail('referrals', error));
+</script>

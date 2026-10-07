@@ -1,0 +1,158 @@
+---
+/* /calculator — brief/04-pages.md: "PURE client JS, no backend calls at all." */
+const { locale } = Astro.props as { locale: 'en' | 'ar' };
+---
+
+<section class="section">
+  <div class="container">
+    <div class="section__head">
+      <p class="eyebrow">{locale === 'ar' ? 'بدون إنترنت' : 'Works offline'}</p>
+      <h1 data-calc-title></h1>
+      <p class="section__lead" data-calc-note></p>
+    </div>
+
+    <div class="calc">
+      <form class="calc__form" data-calc-form novalidate>
+        <div class="calc__rows" data-calc-rows></div>
+
+        <div class="calc__actions">
+          <button type="button" class="btn btn--ghost" data-calc-add></button>
+          <button type="button" class="btn btn--ghost" data-calc-reset></button>
+        </div>
+      </form>
+
+      <aside class="calc__summary" aria-live="polite">
+        <p class="calc__label" data-calc-total-label></p>
+        <p class="calc__total" data-calc-total>0</p>
+        <p class="calc__label" data-calc-pct-label></p>
+        <p class="calc__pct" data-calc-pct>0%</p>
+      </aside>
+    </div>
+  </div>
+</section>
+
+<script>
+  import { getDictionary } from '../../lib/copy';
+  import { localeFromDocument } from '../../lib/auth-ui';
+  import { logDetail } from '../../lib/site';
+
+  const locale = localeFromDocument();
+  const copy = getDictionary(locale) as Record<string, string>;
+  const t = (k: string) => copy[k] ?? '';
+
+  const setText = (sel: string, value: string) => {
+    const node = document.querySelector<HTMLElement>(sel);
+    if (node) node.textContent = value;
+  };
+
+  setText('[data-calc-title]', t('calc.title'));
+  setText('[data-calc-note]', t('calc.note'));
+  setText('[data-calc-total-label]', t('calc.total'));
+  setText('[data-calc-pct-label]', t('calc.percentage'));
+  const addBtn = document.querySelector<HTMLButtonElement>('[data-calc-add]');
+  const resetBtn = document.querySelector<HTMLButtonElement>('[data-calc-reset]');
+  if (addBtn) addBtn.textContent = t('calc.addRow');
+  if (resetBtn) resetBtn.textContent = t('calc.reset');
+
+  const rowsEl = document.querySelector<HTMLElement>('[data-calc-rows]');
+  const totalEl = document.querySelector<HTMLElement>('[data-calc-total]');
+  const pctEl = document.querySelector<HTMLElement>('[data-calc-pct]');
+  if (!rowsEl || !totalEl || !pctEl) throw new Error('calculator markup missing');
+  /* Non-null aliases: the functions below are hoisted declarations, so the
+     narrowing above does not reach them, but these consts are typed as
+     guaranteed markup. */
+  const rows: HTMLElement = rowsEl;
+  const totalOut: HTMLElement = totalEl;
+  const pctOut: HTMLElement = pctEl;
+
+  const DEFAULT_MAX = 100;
+
+  function buildRow(): HTMLDivElement {
+    const row = document.createElement('div');
+    row.className = 'calc__row';
+
+    const markWrap = document.createElement('div');
+    markWrap.className = 'calc__field';
+    const markLabel = document.createElement('label');
+    markLabel.className = 'calc__field-label';
+    markLabel.textContent = t('calc.marksPlaceholder');
+    const mark = document.createElement('input');
+    mark.type = 'number';
+    mark.inputMode = 'decimal';
+    mark.min = '0';
+    mark.step = 'any';
+    mark.placeholder = '0';
+    mark.className = 'calc__input';
+    const markId = `calc-mark-${Math.random().toString(36).slice(2, 9)}`;
+    mark.id = markId;
+    markLabel.htmlFor = markId;
+    markWrap.append(markLabel, mark);
+
+    const maxWrap = document.createElement('div');
+    maxWrap.className = 'calc__field calc__field--max';
+    const maxLabel = document.createElement('label');
+    maxLabel.className = 'calc__field-label';
+    maxLabel.textContent = '/';
+    const max = document.createElement('input');
+    max.type = 'number';
+    max.inputMode = 'decimal';
+    max.min = '1';
+    max.step = 'any';
+    max.value = String(DEFAULT_MAX);
+    max.className = 'calc__input';
+    const maxId = `calc-max-${Math.random().toString(36).slice(2, 9)}`;
+    max.id = maxId;
+    maxLabel.htmlFor = maxId;
+    maxWrap.append(maxLabel, max);
+
+    const remove = document.createElement('button');
+    remove.type = 'button';
+    remove.className = 'btn btn--ghost calc__remove';
+    remove.textContent = t('calc.removeRow');
+    remove.setAttribute('aria-label', `${t('calc.removeRow')}`);
+    remove.addEventListener('click', () => {
+      if (rows.children.length <= 1) {
+        mark.value = '';
+        max.value = String(DEFAULT_MAX);
+      } else {
+        row.remove();
+      }
+      recalc();
+    });
+
+    row.append(markWrap, maxWrap, remove);
+    row.addEventListener('input', recalc);
+    return row;
+  }
+
+  function recalc() {
+    let total = 0;
+    let maxTotal = 0;
+    for (const row of rows.children) {
+      const inputs = row.querySelectorAll<HTMLInputElement>('input');
+      const mark = Number.parseFloat(inputs[0]?.value ?? '');
+      const max = Number.parseFloat(inputs[1]?.value ?? '');
+      if (Number.isFinite(mark)) total += mark;
+      if (Number.isFinite(max) && max > 0) maxTotal += max;
+    }
+    totalOut.textContent = total.toLocaleString(locale === 'ar' ? 'ar-EG' : 'en-US');
+    const pct = maxTotal > 0 ? (total / maxTotal) * 100 : 0;
+    pctOut.textContent = `${pct.toFixed(2)}%`;
+  }
+
+  rows.append(buildRow(), buildRow(), buildRow());
+  addBtn?.addEventListener('click', () => {
+    rows.append(buildRow());
+    recalc();
+  });
+  resetBtn?.addEventListener('click', () => {
+    rows.replaceChildren(buildRow(), buildRow(), buildRow());
+    recalc();
+  });
+
+  try {
+    recalc();
+  } catch (error) {
+    logDetail('calculator', error);
+  }
+</script>

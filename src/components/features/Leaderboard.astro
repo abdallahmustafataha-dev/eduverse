@@ -1,0 +1,87 @@
+---
+/* /leaderboard — brief/04-pages.md: top 10 via the leaderboard() RPC.
+   The RPC returns display names only, never emails (privacy). */
+---
+
+<div>
+  <header class="app__head">
+    <h1 data-lb-title></h1>
+    <p class="app__lead" data-lb-lead></p>
+  </header>
+
+  <section class="widget">
+    <ol class="board" data-lb-list aria-live="polite"></ol>
+  </section>
+</div>
+
+<script>
+  import { supabase } from '../../lib/supabase';
+  import { getDictionary, toArabicDigits } from '../../lib/copy';
+  import { localeFromDocument } from '../../lib/auth-ui';
+  import { logDetail } from '../../lib/site';
+
+  const locale = localeFromDocument();
+  const copy = getDictionary(locale) as Record<string, string>;
+  const t = (k: string) => copy[k] ?? '';
+  const num = (n: number | string) => (locale === 'ar' ? toArabicDigits(n) : String(n));
+
+  const setText = (sel: string, value: string) => {
+    const node = document.querySelector<HTMLElement>(sel);
+    if (node) node.textContent = value;
+  };
+
+  setText('[data-lb-title]', t('board.title'));
+  setText('[data-lb-lead]', t('board.title'));
+
+  const list = document.querySelector<HTMLElement>('[data-lb-list]');
+
+  function empty() {
+    if (!list) return;
+    const li = document.createElement('li');
+    li.className = 'card empty-state';
+    const p = document.createElement('p');
+    p.className = 'empty-state__note';
+    p.textContent = t('board.empty');
+    li.append(p);
+    list.replaceChildren(li);
+  }
+
+  void (async () => {
+    const { data, error } = await supabase.rpc('leaderboard', { limit_n: 10 });
+    if (error) throw error;
+
+    const rows = (data ?? []) as { display_name: string | null; xp: number }[];
+    if (!list) return;
+    list.replaceChildren();
+
+    if (rows.length === 0) {
+      empty();
+      return;
+    }
+
+    rows.forEach((row, index) => {
+      const li = document.createElement('li');
+      li.className = 'board__row';
+
+      const rank = document.createElement('span');
+      rank.className = 'board__rank';
+      rank.setAttribute('aria-label', t('board.rank'));
+      rank.textContent = num(index + 1);
+
+      const name = document.createElement('span');
+      name.className = 'board__name';
+      name.dir = 'auto';
+      name.textContent = row.display_name ?? t('board.you');
+
+      const xp = document.createElement('span');
+      xp.className = 'board__xp';
+      xp.textContent = `${num(row.xp ?? 0)} ${t('board.xp')}`;
+
+      li.append(rank, name, xp);
+      list.append(li);
+    });
+  })().catch((error) => {
+    logDetail('leaderboard', error);
+    empty();
+  });
+</script>

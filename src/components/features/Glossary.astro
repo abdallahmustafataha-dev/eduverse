@@ -1,0 +1,126 @@
+---
+/* /glossary — brief/04-pages.md: searchable A-Z terms (EN+AR). */
+---
+
+<section class="section">
+  <div class="container">
+    <div class="section__head">
+      <p class="eyebrow" data-gl-eyebrow></p>
+      <h1 data-gl-title></h1>
+      <p class="section__lead" data-gl-count></p>
+    </div>
+
+    <form class="widget__form" role="search" data-gl-form>
+      <label class="sr-only" for="glossary-filter" data-gl-label></label>
+      <input id="glossary-filter" type="search" autocomplete="off" data-gl-input />
+    </form>
+
+    <div aria-live="polite" data-gl-status></div>
+    <ul class="stack glossary" data-gl-list></ul>
+  </div>
+</section>
+
+<script>
+  import { supabase } from '../../lib/supabase';
+  import { getDictionary, toArabicDigits } from '../../lib/copy';
+  import { localeFromDocument } from '../../lib/auth-ui';
+  import { logDetail } from '../../lib/site';
+
+  const locale = localeFromDocument();
+  const copy = getDictionary(locale) as Record<string, string>;
+  const t = (k: string) => copy[k] ?? '';
+
+  const setText = (sel: string, value: string) => {
+    const node = document.querySelector<HTMLElement>(sel);
+    if (node) node.textContent = value;
+  };
+
+  setText('[data-gl-eyebrow]', t('meta.glossaryTitle'));
+  setText('[data-gl-title]', t('glossary.title'));
+  setText('[data-gl-label]', t('glossary.search'));
+  const input = document.querySelector<HTMLInputElement>('[data-gl-input]');
+  if (input) input.placeholder = t('glossary.placeholder');
+
+  const status = document.querySelector<HTMLElement>('[data-gl-status]');
+  const list = document.querySelector<HTMLElement>('[data-gl-list]');
+
+  type Row = { term_en: string; term_ar: string; definition_en: string; definition_ar: string };
+  let rows: Row[] = [];
+
+  function message(text: string) {
+    const p = document.createElement('p');
+    p.className = 'empty';
+    p.textContent = text;
+    status?.replaceChildren(p);
+  }
+
+  function render() {
+    if (!list) return;
+    const needle = (input?.value ?? '').trim().toLowerCase();
+    const matches = needle
+      ? rows.filter((row) =>
+          `${row.term_en} ${row.term_ar} ${row.definition_en} ${row.definition_ar}`
+            .toLowerCase()
+            .includes(needle),
+        )
+      : rows;
+
+    list.replaceChildren();
+    if (matches.length === 0) {
+      message(t('glossary.empty'));
+      setText('[data-gl-count]', t('glossary.count').replace('{n}', String(0)));
+      return;
+    }
+
+    const count = t('glossary.count').replace(
+      '{n}',
+      locale === 'ar' ? toArabicDigits(matches.length) : String(matches.length),
+    );
+    setText('[data-gl-count]', count);
+    status?.replaceChildren();
+
+    for (const row of matches) {
+      const li = document.createElement('li');
+      li.className = 'card glossary__item';
+
+      const term = document.createElement('p');
+      term.className = 'glossary__term';
+      term.lang = locale === 'ar' ? 'ar' : 'en';
+      term.textContent = locale === 'ar' ? row.term_ar : row.term_en;
+      term.dir = 'auto';
+
+      const other = document.createElement('p');
+      other.className = 'glossary__alt';
+      other.lang = locale === 'ar' ? 'en' : 'ar';
+      other.dir = 'auto';
+      other.textContent = locale === 'ar' ? row.term_en : row.term_ar;
+
+      const definition = document.createElement('p');
+      definition.className = 'glossary__definition';
+      definition.lang = locale;
+      definition.dir = 'auto';
+      definition.textContent =
+        locale === 'ar' ? row.definition_ar || row.definition_en : row.definition_en || row.definition_ar;
+
+      li.append(term, other, definition);
+      list.append(li);
+    }
+  }
+
+  input?.addEventListener('input', render);
+
+  void (async () => {
+    const { data, error } = await supabase
+      .from('glossary')
+      .select('term_en,term_ar,definition_en,definition_ar')
+      .order('term_en')
+      .limit(500);
+    if (error) throw error;
+    rows = (data ?? []) as Row[];
+    render();
+  })().catch((error) => {
+    logDetail('glossary', error);
+    rows = [];
+    render();
+  });
+</script>

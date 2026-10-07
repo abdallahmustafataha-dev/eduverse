@@ -1,0 +1,334 @@
+---
+/* /planner — brief/04-pages.md: study_plans CRUD + Pomodoro timer
+   (25 focus / 5 break, audible chime, client-side) + focus stats from
+   focus_sessions (today / week totals). Finishing a pomodoro = +20 XP. */
+---
+
+<div>
+  <header class="app__head">
+    <h1 data-pl-title></h1>
+    <p class="app__lead" data-pl-lead></p>
+  </header>
+
+  <section class="widget" aria-labelledby="pl-plans-title">
+    <h2 class="widget__title" id="pl-plans-title" data-pl-plans-title></h2>
+
+    <form class="planner__add" data-pl-form>
+      <label class="sr-only" for="pl-name" data-pl-name-label></label>
+      <input id="pl-name" name="title" type="text" required data-pl-name />
+      <button type="submit" class="btn btn--primary" data-pl-add></button>
+    </form>
+
+    <ul class="stack" data-pl-list></ul>
+  </section>
+
+  <section class="widget" aria-labelledby="pl-pomodoro-title">
+    <h2 class="widget__title" id="pl-pomodoro-title" data-pl-pomo-title></h2>
+
+    <div class="pomo">
+      <p class="pomo__phase" data-pl-phase aria-live="polite"></p>
+      <p class="pomo__time" data-pl-clock>25:00</p>
+
+      <label class="quiz__label" for="pl-subject" data-pl-subject-label></label>
+      <select id="pl-subject" class="quiz__select" data-pl-subject></select>
+
+      <div class="pomo__actions">
+        <button type="button" class="btn btn--primary" data-pl-start></button>
+        <button type="button" class="btn btn--ghost" data-pl-reset></button>
+      </div>
+    </div>
+  </section>
+
+  <section class="widget" aria-labelledby="pl-stats-title">
+    <h2 class="widget__title" id="pl-stats-title" data-pl-stats-title></h2>
+    <dl class="stats">
+      <div class="stats__item">
+        <dt data-pl-today></dt>
+        <dd data-pl-today-value>0</dd>
+      </div>
+      <div class="stats__item">
+        <dt data-pl-week></dt>
+        <dd data-pl-week-value>0</dd>
+      </div>
+    </dl>
+  </section>
+</div>
+
+<script>
+  import { supabase } from '../../lib/supabase';
+  import { getDictionary, toArabicDigits } from '../../lib/copy';
+  import { localeFromDocument } from '../../lib/auth-ui';
+  import { logDetail } from '../../lib/site';
+  import { awardXp, XP_AMOUNTS } from '../../lib/xp';
+
+  const locale = localeFromDocument();
+  const copy = getDictionary(locale) as Record<string, string>;
+  const t = (k: string) => copy[k] ?? '';
+  const num = (n: number | string) => (locale === 'ar' ? toArabicDigits(n) : String(n));
+
+  const setText = (sel: string, value: string) => {
+    const node = document.querySelector<HTMLElement>(sel);
+    if (node) node.textContent = value;
+  };
+
+  setText('[data-pl-title]', t('planner.title'));
+  setText('[data-pl-plans-title]', t('planner.title'));
+  setText('[data-pl-pomo-title]', t('planner.pomodoro'));
+  setText('[data-pl-stats-title]', t('planner.statsTitle'));
+  setText('[data-pl-name-label]', t('planner.planName'));
+  setText('[data-pl-add]', t('planner.add'));
+  setText('[data-pl-subject-label]', t('quiz.subject'));
+  setText('[data-pl-start]', t('planner.start'));
+  setText('[data-pl-reset]', t('planner.reset'));
+  setText('[data-pl-today]', t('planner.today'));
+  setText('[data-pl-week]', t('planner.week'));
+
+  const form = document.querySelector<HTMLFormElement>('[data-pl-form]');
+  const nameInput = document.querySelector<HTMLInputElement>('[data-pl-name]');
+  if (nameInput) nameInput.placeholder = t('planner.planName');
+
+  const planList = document.querySelector<HTMLElement>('[data-pl-list]');
+  const subjectSelect = document.querySelector<HTMLSelectElement>('[data-pl-subject]');
+  const phaseOut = document.querySelector<HTMLElement>('[data-pl-phase]');
+  const clockOut = document.querySelector<HTMLElement>('[data-pl-clock]');
+  const startBtn = document.querySelector<HTMLButtonElement>('[data-pl-start]');
+  const resetBtn = document.querySelector<HTMLButtonElement>('[data-pl-reset]');
+  const todayOut = document.querySelector<HTMLElement>('[data-pl-today-value]');
+  const weekOut = document.querySelector<HTMLElement>('[data-pl-week-value]');
+  const lead = document.querySelector<HTMLElement>('[data-pl-lead]');
+
+  const FOCUS_MIN = 25;
+  const BREAK_MIN = 5;
+  type Phase = 'focus' | 'break';
+  let phase: Phase = 'focus';
+  let remaining = FOCUS_MIN * 60;
+  let timer: number | null = null;
+  let userId: string | null = null;
+
+  function paintClock() {
+    const mins = Math.floor(remaining / 60);
+    const secs = remaining % 60;
+    if (clockOut) {
+      clockOut.textContent = num(`${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`);
+    }
+    if (phaseOut) phaseOut.textContent = t(phase === 'focus' ? 'planner.focus' : 'planner.break');
+  }
+
+  function chime() {
+    try {
+      const Ctor = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+      if (!Ctor) return;
+      const ctx = new Ctor();
+      const oscillator = ctx.createOscillator();
+      const gain = ctx.createGain();
+      oscillator.connect(gain);
+      gain.connect(ctx.destination);
+      oscillator.type = 'sine';
+      oscillator.frequency.value = 660;
+      gain.gain.setValueAtTime(0.0001, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.2, ctx.currentTime + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.6);
+      oscillator.start();
+      oscillator.stop(ctx.currentTime + 0.65);
+      oscillator.addEventListener('ended', () => void ctx.close());
+    } catch (error) {
+      logDetail('pomodoro-chime', error);
+    }
+  }
+
+  function stopTimer() {
+    if (timer !== null) {
+      window.clearInterval(timer);
+      timer = null;
+    }
+  }
+
+  async function finishPhase() {
+    stopTimer();
+    chime();
+
+    if (phase === 'focus') {
+      if (userId) {
+        const subjectId = subjectSelect?.value || null;
+        await supabase
+          .from('focus_sessions')
+          .insert({ user_id: userId, duration_min: FOCUS_MIN, subject_id: subjectId });
+        await awardXp(XP_AMOUNTS.pomodoro);
+        if (lead) lead.textContent = t('planner.sessionDone');
+        await loadStats();
+      }
+      phase = 'break';
+      remaining = BREAK_MIN * 60;
+    } else {
+      phase = 'focus';
+      remaining = FOCUS_MIN * 60;
+    }
+    paintClock();
+    if (startBtn) startBtn.textContent = t('planner.start');
+  }
+
+  function start() {
+    stopTimer();
+    timer = window.setInterval(() => {
+      remaining -= 1;
+      if (remaining <= 0) {
+        void finishPhase();
+        return;
+      }
+      paintClock();
+    }, 1000);
+    if (startBtn) startBtn.textContent = t('planner.pause');
+    paintClock();
+  }
+
+  startBtn?.addEventListener('click', () => {
+    if (timer === null) start();
+    else {
+      stopTimer();
+      if (startBtn) startBtn.textContent = t('planner.resume');
+    }
+  });
+
+  resetBtn?.addEventListener('click', () => {
+    stopTimer();
+    phase = 'focus';
+    remaining = FOCUS_MIN * 60;
+    if (startBtn) startBtn.textContent = t('planner.start');
+    paintClock();
+  });
+
+  // ---- study plans CRUD ----
+
+  function emptyPlans() {
+    const li = document.createElement('li');
+    li.className = 'card empty-state';
+    const p = document.createElement('p');
+    p.className = 'empty-state__note';
+    p.textContent = t('planner.empty');
+    li.append(p);
+    return li;
+  }
+
+  async function loadPlans() {
+    if (!userId || !planList) return;
+    const { data, error } = await supabase
+      .from('study_plans')
+      .select('id,title,items')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+
+    planList.replaceChildren();
+    const rows = (data ?? []) as { id: string; title: string; items: unknown }[];
+    if (rows.length === 0) {
+      planList.append(emptyPlans());
+      return;
+    }
+
+    for (const row of rows) {
+      const li = document.createElement('li');
+      li.className = 'card plan';
+
+      const title = document.createElement('p');
+      title.className = 'plan__title';
+      title.dir = 'auto';
+      title.textContent = row.title;
+
+      const count = Array.isArray(row.items) ? row.items.length : 0;
+      const meta = document.createElement('p');
+      meta.className = 'plan__meta';
+      meta.textContent = num(count);
+
+      const remove = document.createElement('button');
+      remove.type = 'button';
+      remove.className = 'btn btn--ghost';
+      remove.textContent = t('planner.delete');
+      remove.setAttribute('aria-label', `${t('planner.delete')}: ${row.title}`);
+      remove.addEventListener('click', async () => {
+        const { error: delError } = await supabase
+          .from('study_plans')
+          .delete()
+          .eq('id', row.id)
+          .eq('user_id', userId ?? '');
+        if (delError) {
+          logDetail('plan-delete', delError);
+          return;
+        }
+        li.remove();
+        if (planList.children.length === 0) planList.append(emptyPlans());
+      });
+
+      li.append(title, meta, remove);
+      planList.append(li);
+    }
+  }
+
+  form?.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    if (!userId || !nameInput) return;
+    const title = nameInput.value.trim();
+    if (!title) return;
+    const { error } = await supabase
+      .from('study_plans')
+      .insert({ user_id: userId, title, items: [] });
+    if (error) {
+      logDetail('plan-insert', error);
+      return;
+    }
+    nameInput.value = '';
+    await loadPlans();
+  });
+
+  // ---- focus stats ----
+
+  async function loadStats() {
+    if (!userId) return;
+    const { data } = await supabase
+      .from('focus_sessions')
+      .select('duration_min,started_at')
+      .eq('user_id', userId)
+      .gte('started_at', new Date(Date.now() - 7 * 86_400_000).toISOString());
+
+    const rows = (data ?? []) as { duration_min: number; started_at: string }[];
+    const now = new Date();
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    const startOfWeek = startOfToday - 6 * 86_400_000;
+
+    let today = 0;
+    let week = 0;
+    for (const row of rows) {
+      const minutes = Number(row.duration_min ?? 0);
+      const at = new Date(row.started_at).getTime();
+      if (at >= startOfToday) today += minutes;
+      if (at >= startOfWeek) week += minutes;
+    }
+
+    if (todayOut) todayOut.textContent = `${num(today)} ${t('planner.minutes')}`;
+    if (weekOut) weekOut.textContent = `${num(week)} ${t('planner.minutes')}`;
+  }
+
+  async function populateSubjects() {
+    if (!subjectSelect) return;
+    const { data } = await supabase.from('subjects').select('id,name_en,name_ar').order('name_en');
+    const rows = (data ?? []) as { id: string; name_en: string; name_ar: string }[];
+    const none = document.createElement('option');
+    none.value = '';
+    none.textContent = t('planner.noSubjects');
+    subjectSelect.append(none);
+    for (const row of rows) {
+      const option = document.createElement('option');
+      option.value = row.id;
+      option.textContent = locale === 'ar' ? row.name_ar : row.name_en;
+      subjectSelect.append(option);
+    }
+  }
+
+  paintClock();
+
+  void (async () => {
+    const { data: auth } = await supabase.auth.getUser();
+    userId = auth.user?.id ?? null;
+    if (!userId) return; // AppLayout shows the auth gate instead.
+    await Promise.all([populateSubjects(), loadPlans(), loadStats()]);
+  })().catch((error) => logDetail('planner', error));
+</script>

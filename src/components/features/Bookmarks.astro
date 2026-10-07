@@ -1,0 +1,160 @@
+---
+/* /bookmarks — brief/04-pages.md: saved lessons grid + remove.
+   Empty: "Save lessons to find them here." */
+---
+
+<div>
+  <header class="app__head">
+    <h1 data-bm-title></h1>
+    <p class="app__lead" data-bm-count></p>
+  </header>
+
+  <section class="widget" aria-live="polite">
+    <p class="offline-note" data-bm-offline hidden></p>
+    <div data-bm-loading>
+      <p class="empty">…</p>
+    </div>
+    <ul class="bookmarks" data-bm-list hidden></ul>
+  </section>
+</div>
+
+<script>
+  import { supabase } from '../../lib/supabase';
+  import { getDictionary, toArabicDigits } from '../../lib/copy';
+  import { localeFromDocument } from '../../lib/auth-ui';
+  import { localePath, logDetail } from '../../lib/site';
+
+  const locale = localeFromDocument();
+  const copy = getDictionary(locale) as Record<string, string>;
+  const t = (k: string) => copy[k] ?? '';
+
+  const setText = (sel: string, value: string) => {
+    const node = document.querySelector<HTMLElement>(sel);
+    if (node) node.textContent = value;
+  };
+
+  setText('[data-bm-title]', t('bookmarks.title'));
+  setText('[data-bm-offline]', t('bookmarks.loading'));
+
+  const loading = document.querySelector<HTMLElement>('[data-bm-loading]');
+  const list = document.querySelector<HTMLElement>('[data-bm-list]');
+  const countOut = document.querySelector<HTMLElement>('[data-bm-count]');
+  const offline = document.querySelector<HTMLElement>('[data-bm-offline]');
+
+  type Row = {
+    lesson_id: string;
+    lesson: {
+      slug: string;
+      title_en: string;
+      title_ar: string;
+      subject: { name_en: string; name_ar: string } | null;
+    } | null;
+  };
+
+  function emptyCard() {
+    const li = document.createElement('li');
+    li.className = 'card empty-state';
+    const p = document.createElement('p');
+    p.className = 'empty-state__title';
+    p.textContent = t('bookmarks.empty');
+    const a = document.createElement('a');
+    a.className = 'btn btn--primary';
+    a.href = localePath(locale, 'grades/grade-1-primary/');
+    a.textContent = t('hero.cta2');
+    li.append(p, a);
+    return li;
+  }
+
+  async function remove(lessonId: string, item: HTMLElement, userId: string) {
+    const { error } = await supabase
+      .from('bookmarks')
+      .delete()
+      .eq('user_id', userId)
+      .eq('lesson_id', lessonId);
+    if (error) {
+      logDetail('bookmark-remove', error);
+      return;
+    }
+    item.remove();
+    if (list) {
+      if (list.children.length === 0) list.replaceChildren(emptyCard());
+      updateCount(list.children.length);
+    }
+  }
+
+  function updateCount(n: number) {
+    if (!countOut) return;
+    const value = locale === 'ar' ? toArabicDigits(n) : String(n);
+    countOut.textContent = t('bookmarks.count').replace('{n}', value);
+  }
+
+  async function load() {
+    const { data: auth } = await supabase.auth.getUser();
+    const user = auth.user;
+    if (!user) return; // AppLayout shows the auth gate instead.
+
+    const { data, error } = await supabase
+      .from('bookmarks')
+      .select('lesson_id,lesson:lessons(slug,title_en,title_ar,subject:subjects(name_en,name_ar))')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+
+    if (loading) loading.hidden = true;
+    if (!list) return;
+    list.replaceChildren();
+
+    const rows = (data ?? []) as unknown as Row[];
+    updateCount(rows.length);
+
+    if (rows.length === 0) {
+      list.replaceChildren(emptyCard());
+      list.hidden = false;
+      return;
+    }
+
+    for (const row of rows) {
+      const lesson = row.lesson;
+      if (!lesson) continue;
+
+      const li = document.createElement('li');
+      li.className = 'card bookmark';
+
+      const a = document.createElement('a');
+      a.className = 'bookmark__link';
+      a.href = localePath(locale, `lessons/${lesson.slug}/`);
+      a.lang = locale;
+      a.dir = 'auto';
+      a.textContent = locale === 'ar' ? lesson.title_ar || lesson.title_en : lesson.title_en || lesson.title_ar;
+
+      if (lesson.subject) {
+        const subject = document.createElement('p');
+        subject.className = 'bookmark__subject';
+        subject.textContent =
+          locale === 'ar' ? lesson.subject.name_ar : lesson.subject.name_en;
+        a.append(subject);
+      }
+
+      const removeBtn = document.createElement('button');
+      removeBtn.type = 'button';
+      removeBtn.className = 'btn btn--ghost';
+      removeBtn.textContent = t('bookmarks.remove');
+      removeBtn.setAttribute('aria-label', `${t('bookmarks.remove')}: ${a.textContent ?? ''}`);
+      removeBtn.addEventListener('click', () => void remove(row.lesson_id, li, user.id));
+
+      li.append(a, removeBtn);
+      list.append(li);
+    }
+    list.hidden = false;
+  }
+
+  void load().catch((error) => {
+    logDetail('bookmarks', error);
+    if (loading) loading.hidden = true;
+    if (list) {
+      list.replaceChildren(emptyCard());
+      list.hidden = false;
+    }
+    if (offline) offline.hidden = false;
+  });
+</script>

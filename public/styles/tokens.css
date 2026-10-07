@@ -1,0 +1,172 @@
+@import url("https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;0,6..72,700;1,6..72,400&family=Inter:wght@400;500;600;700&family=Amiri:ital,wght@0,400;0,700;1,400&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap");
+
+:root {
+  --paper: #f5f1e8;
+  --paper-deep: #efe3d2;
+  --paper-lift: #fcfaf4;
+  --maroon: #7f1d1d;
+  --card: #fffbf5;
+  --border: #e8ddd0;
+  --border-dark: #5a1a1a;
+  --muted: #8a6b6b;
+  --maroon-soft: #a44a4a;
+  --shadow-card: 0 4px 16px rgba(127, 29, 29, 0.08);
+  --shadow-lift: 0 18px 44px -16px rgba(127, 29, 29, 0.28);
+
+  --r-sm: 8px;
+  --r-md: 12px;
+  --r-lg: 16px;
+  --r-pill: 999px;
+
+  --s-xs: 8px;
+  --s-sm: 12px;
+  --s-md: 16px;
+  --s-lg: 24px;
+  --s-xl: 40px;
+
+  --font-display-en: "Newsreader", Georgia, "Times New Roman", serif;
+  --font-display-ar: "Amiri", "Traditional Arabic", "Times New Roman", serif;
+  --font-body-en: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-body-ar: "IBM Plex Sans Arabic", "Segoe UI", Tahoma, sans-serif;
+
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-spring: cubic-bezier(0.34, 1.4, 0.5, 1);
+  --t-fast: 200ms;
+  --t-base: 420ms;
+  --t-slow: 900ms;
+
+  --board-bg: #ece5da;
+  --board-fg: #2c1616;
+  --chrome-line: rgba(127, 29, 29, 0.16);
+  --chrome-dim: #7b6161;
+}
+
+[data-theme="dark"] {
+  --paper: #7f1d1d;
+  --paper-deep: #6b2020;
+  --paper-lift: #8c2a2a;
+  --maroon: #f5f1e8;
+  --card: #6b2020;
+  --border: #5a1a1a;
+  --border-dark: #f5f1e8;
+  --muted: #d9bfbf;
+  --maroon-soft: #e0b9b9;
+  --shadow-card: 0 4px 16px rgba(0, 0, 0, 0.28);
+  --shadow-lift: 0 18px 44px -16px rgba(0, 0, 0, 0.6);
+
+  --board-bg: #1d0e0e;
+  --board-fg: #f5f1e8;
+  --chrome-line: rgba(245, 241, 232, 0.18);
+  --chrome-dim: #b39a9a;
+}
+
+[data-fonts="fallback"] {
+  --font-display-en: Georgia, "Times New Roman", serif;
+  --font-display-ar: "Traditional Arabic", "Times New Roman", serif;
+  --font-body-en: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-body-ar: Tahoma, "Segoe UI", sans-serif;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  min-height: 100%;
+  font-family: var(--font-body-en);
+  font-size: 16px;
+  line-height: 1.6;
+  color: var(--board-fg);
+  background: var(--board-bg);
+  transition: background-color var(--t-base) var(--ease-out),
+    color var(--t-base) var(--ease-out);
+}
+
+[lang="ar"] body {
+  font-family: var(--font-body-ar);
+}
+
+h1,
+h2,
+h3,
+h4,
+p,
+ul,
+ol,
+figure {
+  margin: 0;
+}
+
+ul,
+ol {
+  padding: 0;
+  list-style: none;
+}
+
+img,
+svg {
+  display: block;
+  max-width: 100%;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+}
+
+a {
+  color: inherit;
+}
+
+:focus-visible {
+  outline: 2px solid var(--maroon);
+  outline-offset: 2px;
+  border-radius: var(--r-sm);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+.u-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+.u-maroon {
+  color: var(--maroon);
+}
+
+.u-muted {
+  color: var(--muted);
+}
+
+.u-start {
+  text-align: start;
+}
+
+.u-mx-auto {
+  margin-inline: auto;
+}

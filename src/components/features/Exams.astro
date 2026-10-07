@@ -1,0 +1,159 @@
+---
+/* /exams — brief/04-pages.md: countdown timers to `exam_dates` + past papers
+   (`kind = 'past_paper'`). */
+---
+
+<section class="section">
+  <div class="container">
+    <div class="section__head">
+      <p class="eyebrow" data-ex-eyebrow></p>
+      <h1 data-ex-title></h1>
+    </div>
+
+    <section class="exams__group" aria-labelledby="exams-upcoming">
+      <h2 class="widget__title" id="exams-upcoming" data-ex-upcoming></h2>
+      <ul class="stack" data-ex-list></ul>
+    </section>
+
+    <section class="exams__group" aria-labelledby="exams-papers">
+      <h2 class="widget__title" id="exams-papers" data-ex-papers></h2>
+      <ul class="stack" data-ex-paper-list></ul>
+    </section>
+  </div>
+</section>
+
+<script>
+  import { supabase } from '../../lib/supabase';
+  import { getDictionary, toArabicDigits } from '../../lib/copy';
+  import { localeFromDocument } from '../../lib/auth-ui';
+  import { localePath, logDetail } from '../../lib/site';
+
+  const locale = localeFromDocument();
+  const copy = getDictionary(locale) as Record<string, string>;
+  const t = (k: string) => copy[k] ?? '';
+  const num = (n: number | string) => (locale === 'ar' ? toArabicDigits(n) : String(n));
+
+  const setText = (sel: string, value: string) => {
+    const node = document.querySelector<HTMLElement>(sel);
+    if (node) node.textContent = value;
+  };
+
+  setText('[data-ex-eyebrow]', t('exams.title'));
+  setText('[data-ex-title]', t('exams.title'));
+  setText('[data-ex-upcoming]', t('exams.upcoming'));
+  setText('[data-ex-papers]', t('exams.pastPapers'));
+
+  const list = document.querySelector<HTMLElement>('[data-ex-list]');
+  const paperList = document.querySelector<HTMLElement>('[data-ex-paper-list]');
+
+  function emptyNote(target: HTMLElement | null, text: string) {
+    if (!target) return;
+    const li = document.createElement('li');
+    li.className = 'card empty-state';
+    const p = document.createElement('p');
+    p.className = 'empty-state__note';
+    p.textContent = text;
+    li.append(p);
+    target.replaceChildren(li);
+  }
+
+  /** Whole days from today to `iso`, so "in 3 days" never flickers. */
+  function daysUntil(iso: string): number {
+    const target = new Date(`${iso}T00:00:00`);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return Math.round((target.getTime() - today.getTime()) / 86_400_000);
+  }
+
+  function renderDates(rows: { title_en: string; title_ar: string; exam_date: string }[]) {
+    if (!list) return;
+    list.replaceChildren();
+    if (rows.length === 0) {
+      emptyNote(list, t('exams.none'));
+      return;
+    }
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    for (const row of rows) {
+      const days = daysUntil(row.exam_date);
+      const li = document.createElement('li');
+      li.className = 'card exam';
+
+      const title = document.createElement('p');
+      title.className = 'exam__title';
+      title.lang = locale;
+      title.dir = 'auto';
+      title.textContent = locale === 'ar' ? row.title_ar || row.title_en : row.title_en || row.title_ar;
+
+      const when = document.createElement('p');
+      when.className = 'exam__date';
+      const date = new Date(`${row.exam_date}T00:00:00`);
+      when.textContent = date.toLocaleDateString(locale === 'ar' ? 'ar-EG' : 'en-GB', {
+        weekday: 'short',
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric',
+      });
+
+      const countdown = document.createElement('p');
+      countdown.className = days < 0 ? 'exam__countdown exam__countdown--past' : 'exam__countdown';
+      countdown.textContent =
+        days < 0 ? t('exams.past') : days === 0 ? t('exams.today') : t('exams.inDays').replace('{n}', num(days));
+
+      li.append(title, when, countdown);
+      list.append(li);
+    }
+  }
+
+  async function load() {
+    const [datesRes, papersRes] = await Promise.allSettled([
+      supabase.from('exam_dates').select('title_en,title_ar,exam_date,level').order('exam_date'),
+      supabase
+        .from('lessons')
+        .select('slug,title_en,title_ar,subject:subjects(id,slug,grades(slug))')
+        .eq('kind', 'past_paper'),
+    ]);
+
+    const dates =
+      datesRes.status === 'fulfilled'
+        ? ((datesRes.value.data ?? []) as { title_en: string; title_ar: string; exam_date: string }[])
+        : [];
+    renderDates(dates);
+
+    if (!paperList) return;
+    paperList.replaceChildren();
+    if (papersRes.status !== 'fulfilled') {
+      emptyNote(paperList, t('exams.noPapers'));
+      return;
+    }
+    const papers = (papersRes.value.data ?? []) as unknown as {
+      slug: string;
+      title_en: string;
+      title_ar: string;
+      subject: { slug: string; grades: { slug: string }[] | { slug: string } | null } | null;
+    }[];
+    if (papers.length === 0) {
+      emptyNote(paperList, t('exams.noPapers'));
+      return;
+    }
+    for (const row of papers) {
+      const li = document.createElement('li');
+      const a = document.createElement('a');
+      a.className = 'card link exam__paper';
+      a.href = localePath(locale, `lessons/${row.slug}/`);
+      a.lang = locale;
+      a.dir = 'auto';
+      a.textContent = locale === 'ar' ? row.title_ar || row.title_en : row.title_en || row.title_ar;
+      li.append(a);
+      paperList.append(li);
+    }
+  }
+
+  void load().catch((error) => {
+    logDetail('exams', error);
+    emptyNote(list, t('exams.none'));
+    emptyNote(paperList, t('exams.noPapers'));
+  });
+</script>

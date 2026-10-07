@@ -11,10 +11,8 @@ export const familyApps = [
   { key: 'agent', name: 'EduAgent', url: 'https://eduagent.pages.dev', light: '/app-logos/eduagent-light.svg', dark: '/app-logos/eduagent-dark.svg' },
 ] as const;
 
-/** Founder portrait (brief/01 section 3). The slot is designed and shipped;
- *  drop the photo into public/ and set PUBLIC_FOUNDER_PORTRAIT to its path. */
-export const FOUNDER_PORTRAIT: string | null =
-  (import.meta.env.PUBLIC_FOUNDER_PORTRAIT as string) || null;
+/* The founder portrait resolution lives in src/lib/founder.ts: it needs
+ * node:fs, and this module is imported by client scripts on every page. */
 
 export function localePath(locale: string, path = ''): string {
   const normalized = path.replace(/^\/+/, '');

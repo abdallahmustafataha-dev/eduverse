@@ -3,7 +3,8 @@ import BaseLayout from '../layouts/BaseLayout.astro';
 import JourneyHero from './JourneyHero.astro';
 import { getDictionary, toArabicDigits, type Locale } from '../lib/copy';
 import { getCatalogCounts, getGrades } from '../lib/data';
-import { FOUNDER_PORTRAIT, localePath } from '../lib/site';
+import { FOUNDER_PORTRAIT } from '../lib/founder';
+import { localePath } from '../lib/site';
 
 interface Props {
   locale: Locale;
@@ -68,12 +69,11 @@ const goals = [
   {/* ---- Section 3: Founder ---- */}
   <section class="section section--tint" id="founder">
     <div class="container founder">
-      {/* Portrait slot: designed now, and switches to the real photo as soon as
-          FOUNDER_PORTRAIT in lib/site.ts points at a file. */}
       <div class="founder__portrait">
         {
           FOUNDER_PORTRAIT ? (
             <img
+              data-founder-portrait
               src={FOUNDER_PORTRAIT}
               alt={t('founder.portraitAlt')}
               width="320"
@@ -96,6 +96,24 @@ const goals = [
       </div>
     </div>
   </section>
+
+  <script>
+    const portrait = document.querySelector<HTMLImageElement>('[data-founder-portrait]');
+    portrait?.addEventListener(
+      'error',
+      () => {
+        const slot = document.createElement('span');
+        slot.className = 'founder__slot';
+        const monogram = document.createElement('span');
+        monogram.className = 'founder__monogram';
+        monogram.setAttribute('aria-hidden', 'true');
+        monogram.textContent = 'AT';
+        slot.append(monogram);
+        portrait.replaceWith(slot);
+      },
+      { once: true },
+    );
+  </script>
 
   {/* ---- Section 4: Final CTA ---- */}
   <section class="section final-cta" id="start">
