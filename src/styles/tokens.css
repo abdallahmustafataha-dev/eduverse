@@ -2691,3 +2691,131 @@ h1 {
     transform: rotate(-1deg);
   }
 }
+
+/* ===========================================================================
+   22. HERO COMPOSITION — two-column editorial (copy + visual), CTAs above
+   the fold. Classic `@media (max-width: …)` ONLY. RTL mirrors automatically:
+   DOM order (copy, visual) lands copy-first in both directions.
+   =========================================================================== */
+.hero__grid {
+  display: grid;
+  grid-template-columns: 1.04fr 0.96fr;
+  gap: clamp(2rem, 5vw, 4.5rem);
+  align-items: center;
+  padding-block: clamp(1rem, 3vw, 2.5rem) 0;
+}
+
+.hero__ctas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.8rem;
+  margin-top: 1.7rem;
+}
+
+.hero__ministats {
+  margin: 1.1rem 0 0;
+  color: var(--muted);
+  font-weight: 700;
+  font-size: 0.95rem;
+}
+
+.hero__visual {
+  position: relative;
+  display: grid;
+  place-items: center;
+  min-height: 340px;
+}
+
+.hero__visual .logo-card {
+  position: relative;
+  z-index: 1;
+  width: min(300px, 74%);
+  transform: rotate(2deg);
+  box-shadow: var(--shadow-lift);
+}
+
+.hero__visual .logo-card img {
+  width: 100%;
+  height: auto;
+}
+
+.orbit {
+  position: absolute;
+  width: min(380px, 94%);
+  aspect-ratio: 1;
+  border: 2px dashed var(--gold);
+  border-radius: 50%;
+  opacity: 0.55;
+}
+
+.float-chip {
+  position: absolute;
+  z-index: 2;
+  background: var(--card);
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  padding: 0.45rem 0.95rem;
+  font-size: 0.82rem;
+  font-weight: 800;
+  box-shadow: var(--shadow-pop-sm);
+  white-space: nowrap;
+}
+
+.float-chip--a {
+  top: 5%;
+  inset-inline-start: 1%;
+  transform: rotate(-4deg);
+}
+
+.float-chip--b {
+  bottom: 7%;
+  inset-inline-end: 3%;
+  transform: rotate(3deg);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .orbit {
+    animation: orbit-spin 46s linear infinite;
+  }
+  .float-chip--b {
+    animation: float-y 6s ease-in-out infinite;
+  }
+}
+
+@keyframes orbit-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes float-y {
+  50% {
+    transform: translateY(-8px) rotate(3deg);
+  }
+}
+
+@media (max-width: 760px) {
+  .hero__grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .hero__visual {
+    min-height: 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.6rem;
+    align-items: center;
+    justify-content: center;
+    margin-top: 0.5rem;
+  }
+  .hero__visual .logo-card {
+    width: min(220px, 60%);
+    transform: rotate(1deg);
+  }
+  .orbit {
+    display: none;
+  }
+  .float-chip {
+    position: static;
+    transform: none;
+  }
+}

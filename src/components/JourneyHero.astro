@@ -98,26 +98,50 @@ const stats = [
     aria-hidden="true"
   />
 
-  <div class="container">
-    <!-- The headline sits ABOVE the start of the road (brief/01 §1) -->
-    <p class="hero__eyebrow">{t('hero.eyebrow')}</p>
-    <h1 class="hero__title">{t('hero.title')}</h1>
-    <p class="hero__sub">{t('hero.sub')}</p>
+  <div class="container hero__grid">
+    <div class="hero__copy">
+      <!-- The headline sits ABOVE the start of the road (brief/01 §1) -->
+      <p class="hero__eyebrow">{t('hero.eyebrow')}</p>
+      <h1 class="hero__title">{t('hero.title')}</h1>
+      <p class="hero__sub">{t('hero.sub')}</p>
 
-    <!-- RULE #1: the logo floats on its own paper card above the start -->
-    <p class="hero__logo">
-      <a class="logo-card" href={localePath(locale)} aria-label={copy['brand.home']}>
+      <div class="hero__ctas">
+        <a class="btn btn--primary btn--lg" href={localePath(locale, 'login/')}>
+          {t('journey.finishCta')}
+        </a>
+        <a class="btn btn--secondary btn--lg" href={localePath(locale, 'grades/')}>
+          {t('hero.cta2')}
+        </a>
+      </div>
+      <p class="hero__ministats">
+        {stats.map((item, i) => (
+          <>
+            {i > 0 && <span aria-hidden="true"> • </span>}
+            <span>{item}</span>
+          </>
+        ))}
+      </p>
+    </div>
+
+    <!-- RULE #1: the logo floats on its own contrasting card, orbit + chips -->
+    <div class="hero__visual" aria-hidden="true">
+      <span class="orbit"></span>
+      <span class="logo-card logo-card--hero">
         <img
           data-logo
           data-light="/eduverse-logos/eduverse-light.svg"
           data-dark="/eduverse-logos/eduverse-dark.svg"
           src="/eduverse-logos/eduverse-light.svg"
-          width="260"
-          alt={t('hero.logoAlt')}
+          width="300"
+          alt=""
         />
-      </a>
-    </p>
+      </span>
+      <span class="float-chip float-chip--a">{stats[0]}</span>
+      <span class="float-chip float-chip--b">{stats[1]}</span>
+    </div>
+  </div>
 
+  <div class="container">
     <div class="journey" data-journey>
       <h2 class="sr-only">{t('journey.heading')}</h2>
       <p class="section__lead">{t('journey.sub')}</p>
@@ -215,16 +239,8 @@ const stats = [
       </div>
     </div>
 
-    <!-- Stats card near the end, then the CTA AT the end of the road -->
+    <!-- The CTA AT the end of the road (stats already live in the hero top) -->
     <div class="journey__end">
-      <p class="journey__stats">
-        {stats.map((item, i) => (
-          <>
-            {i > 0 && <span aria-hidden="true"> • </span>}
-            <b>{item}</b>
-          </>
-        ))}
-      </p>
       <a class="btn btn--primary btn--lg" href={localePath(locale, 'login/')} data-journey-cta>
         {t('journey.finishCta')}
       </a>
